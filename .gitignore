@@ -1,0 +1,23 @@
+# --- Backend (Django) ---
+# Ignore virtual environment
+Backend/venv/
+# Ignore compiled python files
+Backend/__pycache__/
+Backend/*.pyc
+# Ignore local database
+Backend/db.sqlite3
+
+# --- Frontend (Vue) ---
+# Ignore installed node packages
+Frontend/node_modules/
+# Ignore build output
+Frontend/dist/
+Frontend/.output/
+# Ignore environment variables and system files
+Frontend/.env
+Frontend/.DS_Store
+
+# --- General ---
+# Ignore IDE settings
+.vscode/
+.idea/
