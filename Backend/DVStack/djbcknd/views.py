@@ -22,3 +22,4 @@ def buyandsell_list(request):
         return Response(serializer.data)
     except Product.DoesNotExist:
         return Response({"error": "Product not found"}, status=404)
+

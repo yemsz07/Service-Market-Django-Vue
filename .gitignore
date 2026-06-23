@@ -1,4 +1,8 @@
 # --- Backend (Django) ---
+# Add these specific paths to your .gitignore
+Backend/DVStack/djbcknd/__pycache__/
+Backend/DVStack/media/
+
 # Ignore virtual environment
 Backend/venv/
 # Ignore compiled python files

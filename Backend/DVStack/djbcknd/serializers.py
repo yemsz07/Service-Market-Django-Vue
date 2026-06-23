@@ -27,9 +27,17 @@ class ProductSerializer(serializers.ModelSerializer):
         # Gamitin ang '__all__' o ilista ang fields kabilang ang 'category' at 'images'
         fields = ['id', 'name', 'description', 'price', 'city', 'status',
                   'category', 'images']
+                  
 
-# 4. Serializer para sa Service
+
+# serializers.py
 class ServiceSerializer(serializers.ModelSerializer):
+    # Ipakita ang pangalan ng category imbes na ID
+    category = serializers.SlugRelatedField(
+        read_only=True,
+        slug_field='name'  # Dito mo tinutukoy kung anong field ang gusto mong ipakita
+    )
+
     class Meta:
         model = Service
         fields = '__all__'

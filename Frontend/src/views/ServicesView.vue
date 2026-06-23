@@ -5,22 +5,34 @@
       <p>This is the list of services currently active on your account.</p>
     </div>
 
- <DataTable :value="services" paginator :rows="5" :rowsPerPageOptions="[5, 10, 20, 50]" tableStyle="min-width: 50rem">
-    <Column field="name" header="Name" style="width: 25%"></Column>
-    <Column field="status" header="Status" style="width: 25%"></Column>
-    <Column field="price" header="Price" style="width: 25%"></Column>
-    <Column field="category" header="Category" style="width: 25%"></Column>
-</DataTable>
+    <div class="data-table-container">
+      <template v-if="services.length === 0">
+        <p>loading...</p>
+      </template>
 
-
+      <template v-else>
+        <DataTable 
+          :value="services" 
+          paginator 
+          :rows="5" 
+          :rowsPerPageOptions="[5, 10, 20, 50]" 
+          tableStyle="min-width: 50rem"
+        >
+          <Column field="name" header="Name" style="width: 25%"></Column>
+          <Column field="status" header="Status" style="width: 25%"></Column>
+          <Column field="service_city" header="City" style="width: 25%"></Column>
+          <Column field="category" header="Category" style="width: 25%"></Column>
+        </DataTable>
+      </template>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue';
-import axios from 'axios';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
+import api from '../api/api';
 
 // Dito ilalagay yung data na kukunin sa Django API
 const services = ref([]);
@@ -28,7 +40,7 @@ const services = ref([]);
 // Ito yung function na kukuha ng data sa Django API
 const fetchService = async () => {
   try {
-    const response = await axios.get('http://127.0.0.1:8000/api/services/');
+    const response = await api.get('/services/');
     services.value = response.data;
   } catch (error) {
     console.error('Error fetching data:', error);

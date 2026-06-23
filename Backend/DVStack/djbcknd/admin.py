@@ -3,24 +3,30 @@ from django.utils.safestring import mark_safe
 from .models import Profile, ServiceProviderProfile, Category, Product, ProductImage, Service, ServiceImage
 
 # ==========================================
-# MGA INLINE MODELS (Para sa Maramihang Larawan)
+# INLINE MODELS: Para sa 1-to-Many Relationships
 # ==========================================
 
 class ProductImageInline(admin.TabularInline):
-    """Pinapakita ang mga larawan ng produkto sa loob mismo ng Product page"""
+    """
+    Nagbibigay ng interface sa loob ng Product admin page para 
+    mag-upload ng maraming larawan nang sabay-sabay.
+    """
     model = ProductImage
-    extra = 1
+    extra = 1 # Bilang ng blangkong form fields na lalabas
     readonly_fields = ['display_image']
 
     def display_image(self, obj):
+        # Preview function para makita ang image sa Admin panel
         if obj.image:
             return mark_safe(f'<img src="{obj.image.url}" width="100" style="border-radius: 5px;" />')
         return "No Image"
-    display_image.short_description = "Preview"
+    display_image.short_description = "Image Preview"
 
 
 class ServiceImageInline(admin.TabularInline):
-    """Pinapakita ang portfolio images sa loob mismo ng Service page"""
+    """
+    Katulad ng ProductImageInline, pero para sa Service portfolio.
+    """
     model = ServiceImage
     extra = 1
     readonly_fields = ['display_image']
@@ -29,34 +35,37 @@ class ServiceImageInline(admin.TabularInline):
         if obj.image:
             return mark_safe(f'<img src="{obj.image.url}" width="100" style="border-radius: 5px;" />')
         return "No Image"
-    display_image.short_description = "Preview"
+    display_image.short_description = "Image Preview"
 
 
 # ==========================================
-# MGA MAIN ADMIN CUSTOMIZATIONS
+# MAIN ADMIN CONFIGURATIONS
 # ==========================================
 
 @admin.register(ServiceProviderProfile)
 class ServiceProviderProfileAdmin(admin.ModelAdmin):
     """
-    DITO LALABAS ANG MGA REKWISITOS PARA SA PROVDIER APPROVAL.
-    Makikita mo agad ang Avatar, Valid ID, at Address para sa mabilis na pag-approve.
+    Admin portal para sa Service Provider verification process.
+    Focus nito ay ang mabilis na validation ng IDs at Avatars.
     """
+    # Columns na makikita sa list view
     list_display = ['get_username', 'approval_status', 'display_avatar_thumbnail', 'verified_at']
+    # Sidebar filters para mabilis ma-sort ang mga pending applications
     list_filter = ['approval_status']
+    # Search bar configuration
     search_fields = ['profile__user__username', 'detailed_address']
     
-    # Ginagawang readonly ang mga larawan sa detalye para hindi aksidenteng mabago, pero may preview
+    # Ginagawang readonly ang mga sensitive files sa edit page para sa security
     readonly_fields = ['display_avatar', 'display_valid_id']
     
-    # Inaayos ang pagkakasunod-sunod sa loob ng edit page
+    # Pag-aayos ng layout ng form para sa mas magandang user interface
     fieldsets = [
         ('User Info', {'fields': ['profile', 'approval_status', 'verified_at']}),
         ('Sensitibong Detalye (Admin Only)', {'fields': ['detailed_address', 'display_valid_id']}),
         ('Public Info', {'fields': ['display_avatar']}),
     ]
 
-    # Helper methods para sa mga larawan
+    # Helper methods para sa pag-format ng admin table display
     def get_username(self, obj):
         return obj.profile.user.username
     get_username.short_description = 'Username'
@@ -71,7 +80,7 @@ class ServiceProviderProfileAdmin(admin.ModelAdmin):
         if obj.provider_avatar:
             return mark_safe(f'<img src="{obj.provider_avatar.url}" width="200" style="border-radius: 8px;" />')
         return "No Avatar uploaded"
-    display_avatar.short_description = 'Provider Profile Picture'
+    display_avatar.short_description = 'Full View Avatar'
 
     def display_valid_id(self, obj):
         if obj.valid_id:
@@ -82,15 +91,21 @@ class ServiceProviderProfileAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    """Admin configuration para sa Buy & Sell"""
+    """
+    Admin portal para sa Buy & Sell products.
+    """
     list_display = ['name', 'seller', 'price', 'city', 'status', 'display_main_image', 'created_at']
     list_filter = ['status', 'city', 'category']
     search_fields = ['name', 'description', 'seller__user__username']
-    list_editable = ['status'] # Pwede mong gawing SOLD direkta sa listahan nang hindi pumapasok sa loob
-    inlines = [ProductImageInline] # Dito papasok yung multiple images sa ilalim
+    
+    # Pinapayagan ang admin na i-update ang status direkta mula sa list view
+    list_editable = ['status'] 
+    
+    # In-link ang ProductImageInline para sa gallery support
+    inlines = [ProductImageInline]
 
     def display_main_image(self, obj):
-        # Kukunin ang feature image, kung wala, kukuha ng kahit anong unang larawan
+        # Logic para kumuha ng main feature image o first image
         main_img = obj.images.filter(is_feature=True).first() or obj.images.first()
         if main_img and main_img.image:
             return mark_safe(f'<img src="{main_img.image.url}" width="50" height="50" style="object-fit: cover; border-radius: 4px;" />')
@@ -100,7 +115,9 @@ class ProductAdmin(admin.ModelAdmin):
 
 @admin.register(Service)
 class ServiceAdmin(admin.ModelAdmin):
-    """Admin configuration para sa Services"""
+    """
+    Admin configuration para sa Service listings.
+    """
     list_display = ['name', 'provider', 'price', 'service_city', 'status', 'created_at']
     list_filter = ['status', 'service_city', 'category']
     search_fields = ['name', 'description', 'provider__profile__user__username']
@@ -108,9 +125,13 @@ class ServiceAdmin(admin.ModelAdmin):
     inlines = [ServiceImageInline]
 
 
-# I-register ang mga natitirang simpleng models
+# Simple model registrations
 admin.site.register(Profile)
+
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    prepopulated_fields = {'slug': ('name',)} # Awtomatikong gagawa ng slug habang nagtatype ng name
+    """
+    Category management na may automatic slug generation para sa SEO.
+    """
+    prepopulated_fields = {'slug': ('name',)}
     list_display = ['name', 'category_type']

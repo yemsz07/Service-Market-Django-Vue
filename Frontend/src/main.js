@@ -1,14 +1,20 @@
 import { createApp } from 'vue';
 import App from './App.vue';
-import router from './router'; // <--- 1. IMPORT ANG ROUTER MO
+import router from './router';
+
+// 1. PrimeVue Core
 import PrimeVue from 'primevue/config';
-import Aura from '@primeuix/themes/aura';
+import Aura from '@primeuix/themes/aura'; // Ang bagong standard theme
+
+// 2. Global Styles (Layout at Icons)
+import 'primeflex/primeflex.css';
+import 'primeicons/primeicons.css';
 
 const app = createApp(App);
 
-app.use(router); // <--- 2. GAMITIN ANG ROUTER BAGO I-MOUNT
+app.use(router);
 
-// Isasalpak na natin ang PrimeVue na may temang Aura
+// 3. PrimeVue Config
 app.use(PrimeVue, {
     theme: {
         preset: Aura,
