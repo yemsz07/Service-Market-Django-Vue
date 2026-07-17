@@ -28,7 +28,10 @@ SECRET_KEY = 'django-insecure-iu51hq+@gu6jew+#r2cvyis0-!3#g(44!q$x=#b9(pb9@gmoqr
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "127.0.0.1",
+    "localhost",
+]
 
 
 # Application definition
@@ -137,8 +140,14 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
 ]
 
-
+CORS_ALLOW_CREDENTIALS = True
 
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'djbcknd.authentication.CustomJWTAuthentication',
+    ),
+}

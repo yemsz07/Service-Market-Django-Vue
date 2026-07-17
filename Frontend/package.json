@@ -4,12 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
     "@primeuix/themes": "^2.0.3",
+    "@primevue/forms": "^4.5.5",
     "axios": "^1.18.0",
     "pinia": "^3.0.4",
     "primeflex": "^4.0.0",

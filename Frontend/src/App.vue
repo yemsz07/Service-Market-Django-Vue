@@ -3,12 +3,14 @@
     <header class="main-header">
       <div class="header-container">
         
+        <!-- Brand Section -->
         <div class="brand-section">
           <div class="logo-box">🛠️</div>
           <h1 class="brand-name">Service<span class="accent-text">Market</span></h1>
           <span class="dev-badge">Beta</span>
         </div>
 
+        <!-- Search Wrapper -->
         <div class="search-wrapper">
           <span class="search-icon">🔍</span>
           <input 
@@ -18,40 +20,60 @@
           />
         </div>
 
+        <!-- Actions & Navigation Section -->
         <div class="actions-section">
           <nav class="nav-menu">
+            <!-- ALWAYS VISIBLE: Kahit sino pwedeng makakita ng Home -->
             <router-link to="/" class="menu-link" active-class="link-active">
               Home
             </router-link>
-            <router-link to="/services" class="menu-link" active-class="link-active">
-              Services
-            </router-link>
-            <router-link to="/buynsell" class="menu-link" active-class="link-active">
-              Buy & Sell
-            </router-link>
-            <router-link to="/messages" class="menu-link" active-class="link-active">
-              Messages
-            </router-link>
-            <router-link to="/register" class="menu-link auth-btn-solid" active-class="auth-active">
-              <i class="pi pi-user mr-2"></i> Register / Login
-            </router-link>
+            
+            <!-- KAPAG HINDI PA NAKALOGIN: Lalabas lang ang Auth button -->
+            <template v-if="!isLoggedIn">
+              <router-link to="/reglog" class="menu-link auth-btn-solid" active-class="auth-active">
+                <i class="pi pi-user mr-2"></i> Register / Login
+              </router-link>
+            </template>
+
+            <!-- KAPAG NAKALOGIN NA: Lalabas ang mga protected navigation items -->
+            <template v-else>
+              <router-link to="/services" class="menu-link" active-class="link-active">
+                Services
+              </router-link>
+              <router-link to="/buynsell" class="menu-link" active-class="link-active">
+                Buy & Sell
+              </router-link>
+              <router-link to="/messages" class="menu-link" active-class="link-active">
+                Messages
+              </router-link>
+            </template>
           </nav>
 
           <div class="vertical-divider"></div>
 
-          <div class="user-controls">
+          <!-- USER CONTROLS: Lalabas lang din ito kung logged in ang user -->
+          <div class="user-controls" v-if="isLoggedIn">
             <button class="icon-btn" title="Notifications">
               🔔 <span class="noti-dot"></span>
             </button>
             
             <div class="profile-card">
-              <div class="avatar-circle">M</div>
+              <!-- Unang letra ng username para sa avatar -->
+              <div class="avatar-circle">{{ userAvatarLetter }}</div>
+              
               <div class="profile-info">
-                <span class="user-name">Merchant</span>
+                <!-- Tunay na username ng naka-login -->
+                <span class="user-name">{{ username }}</span>
                 <span class="online-indicator">🟢 Online</span>
               </div>
             </div>
+
+            <!-- Opsyonal: Logout Button para makabalik sa Guest state -->
+            <button @click="logout" class="menu-link" style="color: #ef4444; border: none; bg: transparent; cursor: pointer; margin-left: 10px;">
+              Logout
+            </button>
           </div>
+          
         </div>
 
       </div>
@@ -66,7 +88,43 @@
 </template>
 
 <script setup>
-// Iniwan nating blanko muna para malinis, pero kailangan ang script tag kung gagamit ka ng imports balang araw
+import { ref, computed, provide, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import axios from 'axios';
+
+const router = useRouter();
+
+const authUser = ref(null);
+
+provide('globalAuth', {
+  authUser
+});
+
+const username = computed(() => authUser.value || 'Guest');
+const isLoggedIn = computed(() => authUser.value !== null);
+
+const userAvatarLetter = computed(() => {
+  return username.value.charAt(0).toUpperCase();
+});
+
+// Logout handler
+const logout = async () => {
+  try {
+
+    await axios.post('http://127.0.0.1:8000/api/logout/', {}, { withCredentials: true });
+    
+    authUser.value = null;
+    
+    console.log("Logged out successfully!");
+    router.push('/reglog');
+  } catch (err) {
+    console.error("Logout failed:", err);
+    
+  
+    authUser.value = null;
+    router.push('/reglog');
+  }
+};
 </script>
 
 <style scoped>
