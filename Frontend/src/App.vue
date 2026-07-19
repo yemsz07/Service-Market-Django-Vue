@@ -68,8 +68,23 @@
               </div>
             </div>
 
-            <!-- Opsyonal: Logout Button para makabalik sa Guest state -->
-            <button @click="logout" class="menu-link" style="color: #ef4444; border: none; bg: transparent; cursor: pointer; margin-left: 10px;">
+            <!-- AlignJustify / Hamburger Toggle Button -->
+            <Button 
+              type="button"
+              class="menu-toggle-btn" 
+              @click="toggleMenu" 
+              aria-haspopup="true" 
+              aria-controls="overlay_menu"
+            >
+              <!-- Ligtas at siguradong gumaganang icon mula sa primeicons.css -->
+              <i class="pi pi-align-justify" style="font-size: 1.8rem; color: #64748b;"></i>
+            </Button>
+
+            <!-- Overlay Menu para sa dropdown -->
+            <Menu ref="menu" id="overlay_menu" :model="menuItems" :popup="true" />
+
+            <!-- Logout Button -->
+            <button @click="logout" class="menu-link" style="color: #ef4444; border: none; background: transparent; cursor: pointer; margin-left: 10px;">
               Logout
             </button>
           </div>
@@ -91,10 +106,15 @@
 import { ref, computed, provide, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
+import 'primeicons/primeicons.css'; // Dito nanggagaling ang pi-user at pi-bars
+import Button from 'primevue/button';
+import Menu from 'primevue/menu';
+import api from './api/api';
 
 const router = useRouter();
 
 const authUser = ref(null);
+const menu = ref(null); // Ref para sa PrimeVue Menu element
 
 provide('globalAuth', {
   authUser
@@ -107,29 +127,67 @@ const userAvatarLetter = computed(() => {
   return username.value.charAt(0).toUpperCase();
 });
 
+// Toggle para mag-drop down ang menu sa mismong posisyon ng button click
+const toggleMenu = (event) => {
+  menu.value.toggle(event);
+};
+
+// Mga links na bababa pagkinlik ang toggle menu icon
+const menuItems = ref([
+  {
+    label: 'User Portal',
+    items: [
+      {
+        label: 'Portal Dashboard',
+        icon: 'pi pi-th-large',
+        command: () => {
+          router.push('/portal-dashboard'); // Tiyaking tugma ito sa pangalan ng route mo
+        }
+      },
+      {
+        label: 'My Account',
+        icon: 'pi pi-user',
+        command: () => {
+          router.push('/settings');
+        }
+      }
+    ]
+  }
+]);
+
 // Logout handler
 const logout = async () => {
   try {
-
-    await axios.post('http://127.0.0.1:8000/api/logout/', {}, { withCredentials: true });
-    
+    await api.post('/logout/');
+    console.log("Logout successful");
     authUser.value = null;
-    
-    console.log("Logged out successfully!");
     router.push('/reglog');
   } catch (err) {
     console.error("Logout failed:", err);
-    
-  
     authUser.value = null;
     router.push('/reglog');
   }
 };
+
+onMounted(async () => {
+    try {
+        const response = await api.get('/check-auth/');
+
+        if (response.data.authenticated) {
+            authUser.value = response.data.user.username;
+        }
+    } catch (err) {
+        // User is not authenticated, which is expected
+        authUser.value = null;
+    }
+});
+
+
+
 </script>
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-
 
 /* Solid Style para sa Auth Button */
 .auth-btn-solid {
@@ -137,7 +195,7 @@ const logout = async () => {
   color: #ffffff !important;
   font-weight: 700 !important;
   padding: 0.6rem 1.4rem !important;
-  border-radius: 20px !important; /* Pakurbada para maging modernong pill shape */
+  border-radius: 20px !important;
   box-shadow: 0 4px 12px rgba(216, 139, 139, 0.25);
   display: inline-flex;
   align-items: center;
@@ -145,14 +203,12 @@ const logout = async () => {
   transition: all 0.2s ease-in-out;
 }
 
-/* Hover Effect: Lalalim ang kulay at aangat nang bahagya */
 .auth-btn-solid:hover {
   background-color: #bf7373 !important;
   transform: translateY(-1px);
   box-shadow: 0 6px 16px rgba(216, 139, 139, 0.35);
 }
 
-/* Active State kapag andoon ka sa mismong register/login view */
 .auth-active {
   background-color: #a85c5c !important;
 }
@@ -353,5 +409,21 @@ const logout = async () => {
   max-width: 1400px;
   margin: 0 auto;
   padding: 0 2rem;
+}
+
+.menu-toggle-btn {
+  background: none !important;
+  border: none !important;
+  padding: 8px !important;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px !important;
+  transition: background-color 0.2s ease;
+}
+
+.menu-toggle-btn:hover {
+  background-color: #f1f5f9 !important;
 }
 </style>

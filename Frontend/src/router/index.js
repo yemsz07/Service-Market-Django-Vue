@@ -42,6 +42,12 @@ const router = createRouter({
       name: 'register',
       component: () => import('../views/Register.vue'), 
     },
+    {
+      path: '/portal-dashboard',
+      name: 'portal-dashboard',
+      component: () => import('../views/Pdashboard.vue'), 
+      meta: { requiresAuth: true }
+    },
   ],
 })
 

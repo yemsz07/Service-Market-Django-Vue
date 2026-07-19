@@ -11,6 +11,7 @@ from rest_framework.permissions import IsAuthenticated
 from .authentication import CustomJWTAuthentication
 
 
+
 @api_view(['GET'])
 def service_list(request):
     try:
@@ -144,4 +145,24 @@ def logout(request):
     })
     response.delete_cookie("access_token")
     return response
+
+
+@api_view(['GET'])
+@authentication_classes([CustomJWTAuthentication])
+@permission_classes([IsAuthenticated])
+def portal_dashboard(request):
+    print("Portal dashboard accessed")
+    return Response({
+        "message": "Portal dashboard"
+    })
+
+
+@api_view(['GET'])
+@authentication_classes([CustomJWTAuthentication])
+@permission_classes([IsAuthenticated])
+def get_items_for_sale(request):
+    items_for_sale = Product.objects.filter(user=request.user).count()
+    return Response({
+        "items_for_sale": items_for_sale
+    })
 
