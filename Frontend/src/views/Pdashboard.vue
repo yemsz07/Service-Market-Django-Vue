@@ -2,43 +2,51 @@
 import { ref, computed, onMounted } from 'vue';
 import { getPortalDashboard } from '../api/apis';
 
-// Import Child Components
+// Child Component Imports
 import SellItems from './Sell_items.vue';
 import ServicesPost from './Services_post.vue';
 
-// Navigation / Tabs
+// Navigation State (Default tab is 'services')
 const currentTab = ref('services');
 const menuItems = ref([
   { id: 'services', label: 'Services', icon: 'pi pi-server' },
   { id: 'sell-items', label: 'Sell Items', icon: 'pi pi-shopping-bag' }
 ]);
 
-// Shared Data State
+// Shared State Data
 const services = ref([]);
 const inventory = ref([]);
 const isLoading = ref(false);
 
-// Computed Properties
+// Computed Counters
 const activeServicesCount = computed(() => services.value.length);
 const itemsForSaleCount = computed(() => {
   return inventory.value.filter(item => !item.isEditing).length;
 });
 
-// Fetch Dashboard Data
+// Central Dashboard Data Fetcher
 const fetchDashboardData = async () => {
   isLoading.value = true;
   try {
     const response = await getPortalDashboard();
+    console.log("Portal Dashboard API Data:", response?.data); // Para masuri mo sa F12 Console
+
     if (response && response.data) {
+      // Kung Array agad ang binigay ng Backend
       if (Array.isArray(response.data)) {
         inventory.value = response.data.map(item => ({
           ...item,
+          status: item.status || 'AVAILABLE',
           isEditing: false,
           imagePreview: null
         }));
-      } else {
-        inventory.value = (response.data.products || []).map(item => ({
+      } 
+      // Kung Object response (may .products at .services)
+      else {
+        const rawItems = response.data.products || response.data.inventory || response.data.items || [];
+        inventory.value = rawItems.map(item => ({
           ...item,
+          status: item.status || 'AVAILABLE',
           isEditing: false,
           imagePreview: null
         }));
@@ -46,7 +54,7 @@ const fetchDashboardData = async () => {
       }
     }
   } catch (error) {
-    console.error('Error fetching dashboard data:', error);
+    console.error('Error fetching portal dashboard data:', error);
   } finally {
     isLoading.value = false;
   }
@@ -58,7 +66,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div style="display: flex !important; flex-direction: row !important; gap: 32px !important;" class="p-6 max-w-(screen-2xl) mx-auto bg-slate-50/50 min-h-screen w-full font-sans antialiased text-slate-900">
+  <div style="display: flex !important; flex-direction: row !important; gap: 32px !important;" class="p-6 max-w-screen-2xl mx-auto bg-slate-50/50 min-h-screen w-full font-sans antialiased text-slate-900">
     
     <!-- 1. SIDEBAR -->
     <aside class="w-64 shrink-0 space-y-3" style="width: 256px !important; flex-shrink: 0 !important;">
@@ -87,10 +95,15 @@ onMounted(() => {
     <!-- 2. MAIN WORKSPACE CONTAINER -->
     <div style="display: flex !important; flex-direction: column !important; flex-grow: 1 !important; gap: 24px !important; width: 100% !important;">
       
-      <!-- CARDS COUNTER HEADER -->
+      <!-- TOP COUNTER CARDS -->
       <div style="display: flex !important; flex-direction: row !important; gap: 24px !important; width: 100% !important;">
-        <!-- Active Services -->
-        <div class="bg-white p-6 rounded-2xl border border-slate-200/70 shadow-xs flex items-center justify-between" style="flex: 1 !important;">
+        
+        <!-- Active Services Card -->
+        <div 
+          @click="currentTab = 'services'"
+          class="bg-white p-6 rounded-2xl border border-slate-200/70 shadow-xs flex items-center justify-between cursor-pointer hover:border-indigo-300 transition-all" 
+          style="flex: 1 !important;"
+        >
           <div class="flex flex-col gap-1">
             <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Active Services</span>
             <div class="flex items-center gap-3 mt-1">
@@ -105,8 +118,12 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- Items For Sale -->
-        <div class="bg-white p-6 rounded-2xl border border-slate-200/70 shadow-xs flex items-center justify-between" style="flex: 1 !important;">
+        <!-- Items For Sale Card -->
+        <div 
+          @click="currentTab = 'sell-items'"
+          class="bg-white p-6 rounded-2xl border border-slate-200/70 shadow-xs flex items-center justify-between cursor-pointer hover:border-emerald-300 transition-all" 
+          style="flex: 1 !important;"
+        >
           <div class="flex flex-col gap-1">
             <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Items For Sale</span>
             <div class="flex items-center gap-3 mt-1">
@@ -122,9 +139,10 @@ onMounted(() => {
             <i class="pi pi-shopping-bag text-xl"></i>
           </div>
         </div>
+
       </div>
 
-      <!-- 3. WORKSPACE VIEW BOX (DYNAMIC CHILD SWITCHING) -->
+      <!-- 3. WORKSPACE CONTAINER (CHILD SWITCHER) -->
       <div class="bg-white rounded-2xl border border-slate-200/70 shadow-xs overflow-hidden" style="width: 100% !important; display: block !important;">
         
         <!-- SERVICES WORKSPACE -->
@@ -136,7 +154,8 @@ onMounted(() => {
         <!-- SELL ITEMS WORKSPACE -->
         <SellItems 
           v-else-if="currentTab === 'sell-items'" 
-          v-model:inventory="inventory" 
+          :inventory="inventory" 
+          @update:inventory="inventory = $event"
           @refresh="fetchDashboardData"
         />
 
