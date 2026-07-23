@@ -9,7 +9,7 @@ from .views import (
     logout, 
     portal_dashboard, 
     get_items_for_sale,
-    ProductViewSet  # <-- 1. I-import ang bago mong ProductViewSet dito
+    ProductViewSet
 )
 
 # 2. Gumawa ng DefaultRouter instance
@@ -19,7 +19,7 @@ router = DefaultRouter()
 router.register(r'products', ProductViewSet, basename='product')
 
 urlpatterns = [
-    # Ang mga dating paths mo (Intact at walang nabago)
+
     path('services/', service_list, name='service-list'),
     path('buyandsell/', buyandsell_list, name='buyandsell-list'),
     path('login/', login, name='login'),
