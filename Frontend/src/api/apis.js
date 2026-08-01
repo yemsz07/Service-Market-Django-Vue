@@ -11,6 +11,23 @@ export const getPortalDashboard = () => api.get('/portal-dashboard/');
 export const login = (username, password) => api.post('/login/', { username, password });
 export const register = (username, password) => api.post('/register/', { username, password });
 
+export const getInquiries = () => api.get('/get-inquiries/');
+export const createInquiry = (inquiryData) => api.post('/get-inquiries/', inquiryData);
+
+export const getProviderStatus = () => api.get('/check-provider-status/');
+
+export const getCategories = () => api.get('/categories/');
+
+export const applyAsServices = (providerData) => {
+  return api.post('/apply-as-provider/', providerData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+};
+
+
+
 // --- PRODUCTS CRUD ENDPOINTS ---
 
 /**

@@ -6,20 +6,20 @@ import { getPortalDashboard } from '../api/apis';
 import SellItems from './Sell_items.vue';
 import ServicesPost from './Services_post.vue';
 
-// Navigation State (Default tab is 'services')
+// Navigation State
 const currentTab = ref('services');
 const menuItems = ref([
-  { id: 'services', label: 'Services', icon: 'pi pi-server' },
+  { id: 'services', label: 'Service Inquiries', icon: 'pi pi-inbox' },
   { id: 'sell-items', label: 'Sell Items', icon: 'pi pi-shopping-bag' }
 ]);
 
 // Shared State Data
-const services = ref([]);
+const inquiries = ref([]); // 👈 Dito na mapupunta ang service inquiries
 const inventory = ref([]);
 const isLoading = ref(false);
 
 // Computed Counters
-const activeServicesCount = computed(() => services.value.length);
+const totalInquiriesCount = computed(() => inquiries.value.length); // 👈 Nilagay na natin bilang Inquiries count
 const itemsForSaleCount = computed(() => {
   return inventory.value.filter(item => !item.isEditing).length;
 });
@@ -29,10 +29,9 @@ const fetchDashboardData = async () => {
   isLoading.value = true;
   try {
     const response = await getPortalDashboard();
-    console.log("Portal Dashboard API Data:", response?.data); // Para masuri mo sa F12 Console
+    console.log("Portal Dashboard API Data:", response?.data);
 
     if (response && response.data) {
-      // Kung Array agad ang binigay ng Backend
       if (Array.isArray(response.data)) {
         inventory.value = response.data.map(item => ({
           ...item,
@@ -40,9 +39,7 @@ const fetchDashboardData = async () => {
           isEditing: false,
           imagePreview: null
         }));
-      } 
-      // Kung Object response (may .products at .services)
-      else {
+      } else {
         const rawItems = response.data.products || response.data.inventory || response.data.items || [];
         inventory.value = rawItems.map(item => ({
           ...item,
@@ -50,7 +47,9 @@ const fetchDashboardData = async () => {
           isEditing: false,
           imagePreview: null
         }));
-        services.value = response.data.services || [];
+        
+        // Kukunin ang inquiries mula sa backend response
+        inquiries.value = response.data.inquiries || response.data.services || [];
       }
     }
   } catch (error) {
@@ -98,23 +97,23 @@ onMounted(() => {
       <!-- TOP COUNTER CARDS -->
       <div style="display: flex !important; flex-direction: row !important; gap: 24px !important; width: 100% !important;">
         
-        <!-- Active Services Card -->
+        <!-- Service Inquiries Card -->
         <div 
           @click="currentTab = 'services'"
           class="bg-white p-6 rounded-2xl border border-slate-200/70 shadow-xs flex items-center justify-between cursor-pointer hover:border-indigo-300 transition-all" 
           style="flex: 1 !important;"
         >
           <div class="flex flex-col gap-1">
-            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Active Services</span>
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Service Inquiries</span>
             <div class="flex items-center gap-3 mt-1">
-              <span class="text-4xl font-black text-slate-800 tracking-tight leading-none">{{ activeServicesCount }}</span>
+              <span class="text-4xl font-black text-slate-800 tracking-tight leading-none">{{ totalInquiriesCount }}</span>
               <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full border border-emerald-100/50">
-                <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Live
+                <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Active Leads
               </span>
             </div>
           </div>
           <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center border border-indigo-100/30">
-            <i class="pi pi-layers text-xl"></i>
+            <i class="pi pi-inbox text-xl"></i>
           </div>
         </div>
 
@@ -142,13 +141,13 @@ onMounted(() => {
 
       </div>
 
-      <!-- 3. WORKSPACE CONTAINER (CHILD SWITCHER) -->
+      <!-- 3. WORKSPACE CONTAINER -->
       <div class="bg-white rounded-2xl border border-slate-200/70 shadow-xs overflow-hidden" style="width: 100% !important; display: block !important;">
         
-        <!-- SERVICES WORKSPACE -->
+        <!-- SERVICES INQUIRIES WORKSPACE -->
         <ServicesPost 
           v-if="currentTab === 'services'" 
-          :services="services" 
+          :inquiries="inquiries" 
         />
 
         <!-- SELL ITEMS WORKSPACE -->
@@ -162,4 +161,4 @@ onMounted(() => {
       </div>
     </div>
   </div>
-</template>
+</template>        
