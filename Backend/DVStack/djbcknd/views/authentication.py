@@ -14,33 +14,33 @@ from ..serializers import UserSerializer
 
 
 # ==========================================
-# 📝 6. REGISTER (User Account Creation)
+#   REGISTER (User Account Creation)
 # ==========================================
 
-@api_view(['POST'])  # 🚪 Public endpoint for registration.
-@authentication_classes([])  # 🔓 No authentication needed.
+@api_view(['POST'])  #  Public endpoint for registration.
+@authentication_classes([])  #  No authentication needed.
 def register(request):
     """
     Registers a new user account.
     """
-    print("🐍 [DJANGO VIEW] ==================== ENTER register() ====================")
-    print(f"🐍 [DJANGO VIEW] Incoming request.data keys: {list(request.data.keys())}")
+    print(" [DJANGO VIEW] ==================== ENTER register() ====================")
+    print(f" [DJANGO VIEW] Incoming request.data keys: {list(request.data.keys())}")
 
-    username = request.data.get('username')  # 🗣️ Get username.
-    password = request.data.get('password')  # 🗣️ Get password.
-    email = request.data.get('email')        # 🗣️ Get email.
-    print(f"🐍 [DJANGO VIEW] Extracted -> username: {username} | email: {email} | password provided: {'YES' if password else 'NO'}")
+    username = request.data.get('username')  
+    password = request.data.get('password')  
+    email = request.data.get('email')        
+    print(f" [DJANGO VIEW] Extracted -> username: {username} | email: {email} | password provided: {'YES' if password else 'NO'}")
 
-    # 🔴 IF MISSING REQUIRED FIELDS:
+    #  IF MISSING REQUIRED FIELDS:
     if not username or not password or not email:
-        print("🐍 [DJANGO VIEW] ❌ Missing required field(s) -> returning 400.")
-        print("🐍 [DJANGO VIEW] ==================== EXIT register() [400 missing fields] ====================")
+        print(" [DJANGO VIEW]  Missing required field(s) -> returning 400.")
+        print(" [DJANGO VIEW] ==================== EXIT register() [400 missing fields] ====================")
         return Response(
             {"message": "Username, password, and email are required"},
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # 🔴 IF USERNAME OR EMAIL ALREADY TAKEN:
+    #  IF USERNAME OR EMAIL ALREADY TAKEN:
     print("🐍 [DJANGO VIEW] 🔎 Checking if username or email already exists...")
     already_exists = User.objects.filter(Q(username=username) | Q(email=email)).exists()
     print(f"🐍 [DJANGO VIEW] already_exists result: {already_exists}")

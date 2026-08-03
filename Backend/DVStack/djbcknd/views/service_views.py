@@ -20,7 +20,7 @@ class CategoryListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Category.objects.filter(category_type='services')
+         return Category.objects.all()
 
 
 # ========================================= 

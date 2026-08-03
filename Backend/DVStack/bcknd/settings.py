@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 
 
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -37,6 +38,7 @@ ALLOWED_HOSTS = [
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -49,6 +51,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'djbcknd',
     'chattapp',
+    'channels',
 
 ]
 
@@ -150,4 +153,22 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'djbcknd.authentication.CustomJWTAuthentication',
     ),
+}
+
+
+# ==========================================
+# 🔴 CHANNELS & REDIS SETUP (For Real-time Chat)
+# ==========================================
+
+# Ito ang nagsasabi sa Django kung paano mag-handle ng WebSockets
+ASGI_APPLICATION = 'bcknd.asgi.application'
+
+# Redis Connection
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 6379)],
+        },
+    },
 }

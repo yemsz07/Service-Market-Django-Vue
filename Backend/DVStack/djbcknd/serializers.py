@@ -1,5 +1,5 @@
 """
-Serializes configuration for djbcknd app.
+Serializers configuration for djbcknd app.
 Translates Django database models into JSON format (and vice versa) for API requests.
 """
 
@@ -7,13 +7,13 @@ Translates Django database models into JSON format (and vice versa) for API requ
 # 📦 1. IMPORTS (Preparing our tools)
 # ==========================================
 
-import logging  # 📜 Logger: Used to record backend errors/warnings.
+import logging
 
-from django.contrib.auth.models import User  # 👤 Default Django User model.
-from django.core.validators import FileExtensionValidator  # 🛡️ File Guard: Restricts allowed image file formats.
-from rest_framework import serializers  # 🗣️ DRF Serializers: Converts Python objects <-> JSON data.
+from django.contrib.auth.models import User
+from django.core.validators import FileExtensionValidator
+from rest_framework import serializers
 
-from .models import Category, Product, ProductImage, Service, ServiceInquiry, ServiceProviderProfile, Profile  # 🧸 Database Models to serialize.
+from .models import Category, Product, ProductImage, Service, ServiceInquiry, ServiceProviderProfile, Profile
 
 logger = logging.getLogger(__name__)
 
@@ -117,17 +117,43 @@ class ServiceSerializer(serializers.ModelSerializer):
         queryset=Category.objects.all()
     )
 
+    provider_name = serializers.CharField(source='provider.profile.user.username', read_only=True)
+
     class Meta:
         model = Service
-        fields = '__all__'
 
+        fields = [
+            'id', 
+            'name', 
+            'description', 
+            'price', 
+            'service_city', 
+            'status', 
+            'category', 
+            'provider', 
+            'provider_name', 
+            'created_at', 
+            'updated_at'
+        ]
 
 class CreateServiceSerializer(serializers.ModelSerializer):
     """
-    Serializes Service creation and listing safely handling String Category lookups.
+    Serializes Service creation with Category ID.
+    ✅ CHANGED: Now accepts Category ID instead of string name.
     """
-    # Allow category to be passed as string name (e.g. "IT & Tech Services")
-    category = serializers.CharField(required=False, allow_null=True)
+    # ✅ ONLY CHANGE: Category uses ID (Primary Key) instead of string name
+    category = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.filter(category_type='SERVICE'),
+        required=True,
+        allow_null=False,
+        error_messages={
+            'does_not_exist': 'Invalid category ID. Please select a valid category.',
+            'incorrect_type': 'Category ID must be an integer.',
+            'null': 'Category is required.',
+            'required': 'Category is required.'
+        }
+    )
+    
     image = serializers.ImageField(required=False, write_only=True)
     
     class Meta:
@@ -135,19 +161,8 @@ class CreateServiceSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ['provider', 'created_at', 'updated_at']
     
-    def validate_category(self, value):
-        if value:
-            try:
-                # 💡 Hahanapin ang Category sa pangalan LANG (o kahit anong category_type)
-                category_obj = Category.objects.get(name=value)
-                return category_obj  # 🎯 Ibabalik ang mismong Category Model Instance
-            except Category.DoesNotExist:
-                raise serializers.ValidationError(f"Category '{value}' does not exist in database.")
-        return None
-    
     def create(self, validated_data):
         uploaded_image = validated_data.pop('image', None)
-        
         service = super().create(validated_data)
         
         if uploaded_image:

@@ -25,6 +25,7 @@
       >
         <!-- Pinalitan na ng Child Component! -->
         <CreateServiceForm 
+          :categories="categories" 
           @submitted="handleSuccess" 
           @close="showCreateModal = false" 
         />
@@ -225,8 +226,6 @@ import Dialog from 'primevue/dialog';
 import CreateServiceForm from './CreateServiceForm.vue'
 import ApplyProviderForm from './ApplyProviderForm.vue'
 
-
-
 // --- REACTIVE STATES ---
 
 // Inquiry Data States
@@ -236,7 +235,7 @@ const displayDialog = ref(false);
 const selectedInquiry = ref(null);
 
 // Create Service Modal & Form States
-const showCreateModal = ref(false); // Gagamitin natin 'to para sa v-model ng Create Service Dialog
+const showCreateModal = ref(false); 
 const isSubmitting = ref(false);
 
 const serviceForm = reactive({
@@ -247,15 +246,12 @@ const serviceForm = reactive({
   image: null
 });
 
-const categories = ref([
-  { name: 'Printing Services', code: 'PRNT' },
-  { name: 'Digital Services', code: 'DIGI' },
-  { name: 'Events', code: 'EVNT' }
-]);
+// ✅ CHANGE 1: Make categories an empty array instead of hardcoded dummy data
+const categories = ref([]); 
 
 // Provider Status & Apply Modal States
 const showApplyModal = ref(false);
-const providerStatus = ref(null); // 'APPROVED', 'PENDING', 'REJECTED', 'NOT_APPLIED'
+const providerStatus = ref(null); 
 const checkingStatus = ref(false);
 
 // --- HANDLERS & FUNCTIONS ---
@@ -265,8 +261,7 @@ const onFileSelect = (event) => {
 };
 
 const handleSuccess = () => {
-  showCreateModal.value = false // Isasara ang modal
-  // fetchServices() // I-trigger ang pag-reload ng listahan kung mayroon
+  showCreateModal.value = false 
 }
 
 // Fetch All Inquiries from Django API
@@ -279,6 +274,18 @@ const fetchInquiries = async () => {
     console.error('Error fetching client inquiries:', error);
   } finally {
     loading.value = false;
+  }
+};
+
+// ✅ CHANGE 2: Add this new function to fetch categories from your Admin/Backend
+const fetchCategories = async () => {
+  try {
+    // ⚠️ IMPORTANT: Change this URL to match your actual Django endpoint
+    const response = await api.get('/categories/'); 
+    categories.value = response.data;
+    console.log("✅ Categories loaded from backend:", categories.value);
+  } catch (error) {
+    console.error('Error fetching categories:', error);
   }
 };
 
@@ -344,9 +351,11 @@ const formatDate = (dateString) => {
   });
 };
 
-onMounted(fetchInquiries);
-
-
+// ✅ CHANGE 3: Fetch BOTH inquiries AND categories when the page loads
+onMounted(async () => {
+  await fetchInquiries();
+  await fetchCategories();
+});
 </script>
 
 

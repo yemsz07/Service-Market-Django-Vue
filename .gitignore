@@ -1,27 +1,32 @@
 # --- Backend (Django) ---
-# Add these specific paths to your .gitignore
-Backend/DVStack/djbcknd/__pycache__/
-Backend/DVStack/media/
+# Ignore ALL compiled python files and caches in any folder
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
-# Ignore virtual environment
+# Ignore local database & media uploads
+Backend/**/db.sqlite3
+Backend/**/media/
+
+# Ignore virtual environments (kahit ano pang pangalan)
+venv/
+.venv/
+env/
 Backend/venv/
-# Ignore compiled python files
-Backend/__pycache__/
-Backend/*.pyc
-# Ignore local database
-Backend/db.sqlite3
 
 # --- Frontend (Vue) ---
-# Ignore installed node packages
-Frontend/node_modules/
-# Ignore build output
-Frontend/dist/
+# Ignore installed node packages & build output
+**/node_modules/
+**/dist/
 Frontend/.output/
-# Ignore environment variables and system files
-Frontend/.env
-Frontend/.DS_Store
 
-# --- General ---
-# Ignore IDE settings
+# Ignore local environment variables & OS files
+.env
+.env.local
+.DS_Store
+Thumbs.db
+
+# --- General / IDEs ---
 .vscode/
 .idea/

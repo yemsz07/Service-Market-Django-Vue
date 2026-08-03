@@ -1,12 +1,13 @@
 <template>
   <div class="space-y-4">
+
     <!-- Service Title -->
     <div class="field">
       <label for="title" class="font-bold">Service Title *</label>
       <InputText 
         id="title" 
         v-model="form.title" 
-        placeholder="FULL-STACK DEVELOPER" 
+        placeholder="Services Title" 
         class="w-full"
       />
     </div>
@@ -28,11 +29,12 @@
       <Select 
         id="category" 
         v-model="form.category" 
-        :options="categories" 
+        :options="props.categories" 
         optionLabel="name" 
-        optionValue="name" 
+        optionValue="id"
         placeholder="Select a Category" 
         class="w-full"
+        :loading="props.loading"
       />
     </div>
 
@@ -96,7 +98,7 @@
         label="Save Service" 
         icon="pi pi-check" 
         class="p-button-success" 
-        :loading="loading" 
+        :loading="submitting" 
         @click="submitForm" 
       />
     </div>
@@ -104,34 +106,30 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, watch, onMounted } from 'vue'
 import api from '../api/api'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import InputNumber from 'primevue/inputnumber'
 import Button from 'primevue/button'
 
-// Emits para makipag-usap sa Parent component
+// Define props
+const props = defineProps({
+  categories: {
+    type: Array,
+    default: () => []
+  },
+  loading: {
+    type: Boolean,
+    default: false
+  }
+})
+
+// Emits
 const emit = defineEmits(['submitted', 'close'])
 
-const loading = ref(false)
+const submitting = ref(false)
 const selectedFile = ref(null)
-
-// Sample categories (I-adjust base sa backend options mo)
-const categories = ref([])
-
-const fetchCategories = async () => {
-  try {
-    const response = await api.get('categories/');
-    categories.value = response.data
-  } catch (error) {
-    console.error('Error fetching categories:', error)
-  }
-}
-
-onMounted(() => {
-  fetchCategories()
-})
 
 const form = reactive({
   title: '',
@@ -139,6 +137,18 @@ const form = reactive({
   category: null,
   price: null,
   service_city: ''
+})
+
+// ✅ Debug: Watch for category changes
+watch(() => props.categories, (newVal) => {
+  console.log('🔄 Categories prop changed:', newVal)
+  console.log('📊 Categories count:', newVal?.length)
+}, { immediate: true, deep: true })
+
+// ✅ Debug: Check on mount
+onMounted(() => {
+  console.log('🔍 Component mounted. Categories prop:', props.categories)
+  console.log('📊 Categories count:', props.categories?.length)
 })
 
 // File Handler
@@ -151,16 +161,14 @@ const handleFileUpload = (event) => {
 
 // Submit Function
 const submitForm = async () => {
-  // Simple validation
   if (!form.title || !form.description || !form.category || !form.price || !form.service_city) {
     alert('Please fill in all required fields.')
     return
   }
 
-  loading.value = true
+  submitting.value = true
 
   try {
-    // Gagamit ng FormData dahil may file/image na kasama
     const formData = new FormData()
     formData.append('name', form.title)
     formData.append('description', form.description)
@@ -172,21 +180,43 @@ const submitForm = async () => {
       formData.append('image', selectedFile.value)
     }
 
-    // Axios Post Call sa Django backend endpoint mo
-    await api.post('/create-service/', formData, {
+    console.log('Submitting service with data:')
+    for (let pair of formData.entries()) {
+      console.log(pair[0] + ':', pair[1])
+    }
+
+    const response = await api.post('/create-service/', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
     })
 
-    // Kapag matagumpay, sabihin ang parent component
+    console.log('Service created successfully:', response.data)
     emit('submitted')
 
   } catch (error) {
     console.error('Error saving service:', error.response?.data || error)
-    alert('Failed to save service. Check console for details.')
+    const errorMessage = error.response?.data?.category?.[0] || 
+                        error.response?.data?.message || 
+                        error.response?.data?.error ||
+                        'Failed to save service. Please check the console for details.'
+    alert(errorMessage)
   } finally {
-    loading.value = false
+    submitting.value = false
   }
 }
 </script>
+
+<style scoped>
+.field {
+  margin-bottom: 1rem;
+}
+.field label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+.hidden {
+  display: none;
+}
+</style>

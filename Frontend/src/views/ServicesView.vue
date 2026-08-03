@@ -26,9 +26,16 @@
             <i class="pi pi-briefcase" style="font-size: 3rem; color: #d88b8b;"></i>
           </div>
 
-          <!-- Card Content -->
+                    <!-- Card Content -->
           <div class="card-main-content">
             <h4 class="service-name">{{ service.name }}</h4>
+            
+            <!-- ✅ BAGONG NILAGAY: Pangalan ng Provider/User -->
+            <p class="service-provider">
+              <i class="pi pi-user" style="font-size: 0.8rem;"></i> 
+              Posted by: <strong>{{ service.provider_name || 'Unknown User' }}</strong>
+            </p>
+
             <p class="service-location">{{ service.service_city }}</p>
             
             <div class="service-meta">
@@ -369,4 +376,15 @@ onMounted(fetchService);
   color: #64748b;
   padding-bottom: 4px;
 }
+
+.service-provider {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin: 0.25rem 0 0.5rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+
 </style>
