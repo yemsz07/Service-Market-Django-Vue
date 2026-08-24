@@ -180,7 +180,8 @@ def check_auth(request):
 # ==========================================
 
 @api_view(['POST'])  # 🚪 Post request to logout.
-@authentication_classes([IsAuthenticated])
+@authentication_classes([CustomJWTAuthentication])
+@permission_classes([IsAuthenticated])
 def logout(request):
     """
     Logs out user by deleting the access token cookie.

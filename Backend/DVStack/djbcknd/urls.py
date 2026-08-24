@@ -40,6 +40,12 @@ from .views.inquiry_views import (
     get_inquiries
 )
 
+# 6. Messages / Chat Views (views/message_views.py)
+from .views.message_views import (
+    get_conversations,
+    get_chat_history
+)
+
 # Router Setup para sa ViewSets
 router = DefaultRouter()
 router.register(r'products', ProductViewSet, basename='product')
@@ -69,6 +75,10 @@ urlpatterns = [
     # 📩 INQUIRIES ENDPOINTS
     path('create-inquiry/', create_inquiry, name='create-inquiry'),
     path('get-inquiries/', get_inquiries, name='get-inquiries'),
+
+    # 💬 MESSAGES / CHAT ENDPOINTS
+    path('messages/conversations/', get_conversations, name='get-conversations'),
+    path('messages/history/<int:user_id>/', get_chat_history, name='get-chat-history'),
 
     # 📦 ROUTER URLS (ProductViewSet)
     path('', include(router.urls)),

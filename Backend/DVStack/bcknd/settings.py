@@ -9,36 +9,40 @@ https://docs.djangoproject.com/en/6.0/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
+
+
 import os
 from pathlib import Path
+import ssl
+import certifi
+from decouple import config
 
-
-
+# ==========================================
+# ⚙️ PATHS & CORE SETTINGS
+# ==========================================
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-
-
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
-
-# SECURITY WARNING: keep the secret key used in production secret!
+# SECURITY WARNING: Keep secret key hidden in production using .env
 SECRET_KEY = 'django-insecure-iu51hq+@gu6jew+#r2cvyis0-!3#g(44!q$x=#b9(pb9@gmoqr'
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# SECURITY WARNING: Don't run with debug turned on in production!
+DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = [
-    "127.0.0.1",
-    "localhost",
-]
+ALLOWED_HOSTS = config(
+    'ALLOWED_HOSTS', 
+    default='127.0.0.1,localhost', 
+    cast=lambda v: [s.strip() for s in v.split(',')]
+)
 
 
-# Application definition
-
+# ==========================================
+# 📦 INSTALLED APPS
+# ==========================================
 INSTALLED_APPS = [
+    # ASGI Server (Daphne MUST be first before staticfiles)
     'daphne',
+
+    # Built-in Django Apps
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -46,17 +50,22 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    # My Apps
+    # Third-party Apps
     'corsheaders',
     'rest_framework',
-    'djbcknd',
-    'chattapp',
     'channels',
 
+    # Local Apps
+    'djbcknd',
+    'chatapp',
 ]
 
+
+# ==========================================
+# 🛡️ MIDDLEWARE
+# ==========================================
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # Must be as high as possible
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -66,7 +75,13 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+
+# ==========================================
+# 🌐 URLS, TEMPLATES, & APPLICATIONS
+# ==========================================
 ROOT_URLCONF = 'bcknd.urls'
+WSGI_APPLICATION = 'bcknd.wsgi.application'
+ASGI_APPLICATION = 'bcknd.asgi.application'
 
 TEMPLATES = [
     {
@@ -83,61 +98,62 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'bcknd.wsgi.application'
 
-
-# Database
-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-
+# ==========================================
+# 🗄️ DATABASES & ROUTING
+# ==========================================
 DATABASES = {
+    # Main Relational Database (PostgreSQL)
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'dvstacks',
-        'USER': 'postgres',
-        'PASSWORD': '12345',
-        'HOST': 'localhost',
-        'PORT': '5432', 
+        'NAME': config('DB_NAME', default='dvstacks'),
+        'USER': config('DB_USER', default='postgres'),
+        'PASSWORD': config('DB_PASSWORD', default='12345'),
+        'HOST': config('DB_HOST', default='localhost'),
+        'PORT': config('DB_PORT', default='5432'),
+    },
+    # Secondary Document Database (MongoDB)
+    'mongodb': {
+        'ENGINE': 'django_mongodb_backend',
+        'NAME': config('MONGO_DB_NAME', default='servicemarket_db'),
+        'HOST': config('MONGO_URI', default='mongodb+srv://yemsz07_db_user:R1rCzgUsSOUhICJX@cluster0.85vsamp.mongodb.net/?appName=Cluster0'),
     }
 }
 
+DATABASE_ROUTERS = ['bcknd.db_routers.MongoRouter']
 
-# Password validation
-# https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
+
+# ==========================================
+# 🔴 CHANNELS & REDIS (For Real-time Chat)
+# ==========================================
+# Using in-memory channel layer for development (no Redis required)
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}
+
+
+# ==========================================
+# 🔐 REST FRAMEWORK & SECURITY
+# ==========================================
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'djbcknd.authentication.CustomJWTAuthentication',
+    ),
+}
 
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
 
-# Internationalization
-# https://docs.djangoproject.com/en/6.0/topics/i18n/
-
-LANGUAGE_CODE = 'en-us'
-
-TIME_ZONE = 'UTC'
-
-USE_I18N = True
-
-USE_TZ = True
-
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/6.0/howto/static-files/
-
-STATIC_URL = 'static/'
-
-
+# ==========================================
+# 🌐 CORS CONFIGURATION
+# ==========================================
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
@@ -146,29 +162,23 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 
 
+# ==========================================
+# 🌐 INTERNATIONALIZATION
+# ==========================================
+LANGUAGE_CODE = 'en-us'
+TIME_ZONE = 'UTC'
+USE_I18N = True
+USE_TZ = True
+
+
+# ==========================================
+# 📁 STATIC & MEDIA FILES
+# ==========================================
+STATIC_URL = 'static/'
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'djbcknd.authentication.CustomJWTAuthentication',
-    ),
-}
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
-# ==========================================
-# 🔴 CHANNELS & REDIS SETUP (For Real-time Chat)
-# ==========================================
-
-# Ito ang nagsasabi sa Django kung paano mag-handle ng WebSockets
-ASGI_APPLICATION = 'bcknd.asgi.application'
-
-# Redis Connection
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [('127.0.0.1', 6379)],
-        },
-    },
-}
+DATABASE_ROUTERS = ['chatapp.db_router.MongoRouter']

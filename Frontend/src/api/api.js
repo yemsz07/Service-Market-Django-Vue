@@ -22,4 +22,17 @@ export const getImageUrl = (path) => {
   return `${cleanBase}${cleanPath}`;
 };
 
+// 🟢 DAGDAG DITO PARA SA WEBSOCKET URL:
+export const getWsUrl = (path) => {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+  
+  // Palitan ang http:// ng ws:// at https:// ng wss://
+  const wsBase = baseUrl.replace(/^http/, 'ws');
+  
+  const cleanBase = wsBase.replace(/\/+$/, '');
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+
+  return `${cleanBase}${cleanPath}`;
+};
+
 export default api;

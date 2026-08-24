@@ -31,7 +31,7 @@
           <Card class="product-card shadow-1 border-round-xl overflow-hidden h-full hover:shadow-4 transition-duration-300">
             
             <template #header>
-              <!-- 1. Seller Info Header (Parang sa Carousell!) -->
+              <!-- 1. Seller Info Header -->
               <div class="seller-header px-3 pt-3 pb-2 flex align-items-center gap-2">
                 <img 
                   :src="product.seller?.avatar || 'https://placehold.co/32x32?text=U'" 
@@ -44,7 +44,7 @@
                 </div>
               </div>
 
-              <!-- 2. Product Image na may saktong Aspect Ratio -->
+              <!-- 2. Product Image -->
               <div class="img-wrapper">
                 <img :alt="product.name" :src="getProductImage(product)" class="product-img" />
               </div>
@@ -60,11 +60,22 @@
               <p class="desc-limit">{{ product.description }}</p>
             </template>
 
-            <!-- 5. Footer (Price + Wishlist Heart Icon) -->
+            <!-- 5. Footer (Price + Chat Button + Heart) -->
             <template #footer>
-              <div class="flex justify-content-between align-items-center pt-1">
-                <div class="price">₱{{ Number(product.price).toLocaleString() }}</div>
-                <i class="pi pi-heart text-xl text-500 cursor-pointer hover:text-red-500 transition-colors"></i>
+              <div class="flex flex-column gap-2 pt-1">
+                <div class="flex justify-content-between align-items-center">
+                  <div class="price font-bold text-xl text-primary">₱{{ Number(product.price).toLocaleString() }}</div>
+                  <i class="pi pi-heart text-xl text-500 cursor-pointer hover:text-red-500 transition-colors"></i>
+                </div>
+
+                <!-- Chat Seller Button -->
+                <Button 
+                  label="Chat Seller" 
+                  icon="pi pi-comments" 
+                  class="p-button-outlined p-button-sm w-full mt-2" 
+                  :disabled="!product.seller_user_id || currentUserId === product.seller_user_id"
+                  @click="openChat(product.seller_user_id, product.seller_username)" 
+                />
               </div>
             </template>
 
@@ -78,13 +89,19 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import Card from 'primevue/card';
 import Skeleton from 'primevue/skeleton';
+import Button from 'primevue/button';
 import api from '../api/api';
+
+const router = useRouter();
 
 const products = ref([]);
 const isLoading = ref(true);
+const currentUserId = ref(null); 
 
+// Helper function para sa product image URL
 function getProductImage(product) {
   const images = product.images || [];
   if (images.length === 0) return 'https://placehold.co/400x300?text=No+Image';
@@ -96,19 +113,65 @@ function getProductImage(product) {
   return `${baseUrl}${selected.image}`;
 }
 
-const fetchService = async () => {
-    try {
-        const response = await api.get('/buyandsell/');
-        products.value = response.data;
-        isLoading.value = false;
-    } 
-    catch (error) {
-        console.error('Error:', error); 
-        isLoading.value = false; 
+// Handler para sa pag-chat sa seller
+const openChat = (sellerId, sellerUsername) => {
+  console.log('DEBUG OPENCHAT:', {
+    sellerId: sellerId,
+    currentUserId: currentUserId.value,
+    typeOfSellerId: typeof sellerId,
+    typeOfCurrentUser: typeof currentUserId.value
+  });
+  
+  const myId = Number(currentUserId.value);
+  const targetSellerId = Number(sellerId);
+
+  // Pigilan kung walang seller ID o kung sarili mong product
+  if (!sellerId || myId === targetSellerId) {
+    console.warn('Cannot open chat with yourself or invalid seller.');
+    return;
+  }
+
+  // Redirect papuntang Messages view gamit ang Target Seller ID
+  router.push({
+    name: 'messages',
+    query: { 
+      targetUserId: targetSellerId,
+      sellerName: sellerUsername 
     }
+  });
 };
 
-onMounted(fetchService);
+// Fetch Auth Status
+const checkAuth = async () => {
+  try {
+    // 🟢 TAMA: /check-auth/ na lang dahil kasama na ang /api sa baseURL ng Axios
+    const response = await api.get('/check-auth/');
+    if (response.data && response.data.user) {
+      currentUserId.value = response.data.user.id;
+    }
+  } catch (error) {
+    console.warn('User is not authenticated:', error);
+    currentUserId.value = null;
+  }
+};
+
+// Fetch Products List
+const fetchProducts = async () => {
+  try {
+    const response = await api.get('/buyandsell/');
+    products.value = response.data;
+    console.log('PRODUCTS DATA:', response.data[0]);
+  } catch (error) {
+    console.error('Error fetching products:', error); 
+  } finally {
+    isLoading.value = false; 
+  }
+};
+
+// 🟢 Pinagsamang lifecycle hook para sabay i-load pagka-mount ng component
+onMounted(async () => {
+  await Promise.all([checkAuth(), fetchProducts()]);
+});
 </script>
 
 <style scoped>
@@ -183,5 +246,21 @@ onMounted(fetchService);
 }
 :deep(.p-card .p-card-footer) {
   padding: 0.5rem 0 0 0 !important;
+}
+
+
+/* Matching Price and Button to Logo Palette */
+.price {
+  color: #c86d64; /* Coral/Red tone na kapareho ng logo */
+  font-weight: 700;
+}
+
+.p-button-outlined {
+  color: #c86d64 !important;
+  border-color: #c86d64 !important;
+}
+
+.p-button-outlined:hover {
+  background-color: #fdf2f2 !important;
 }
 </style>

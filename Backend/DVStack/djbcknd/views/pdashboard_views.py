@@ -3,7 +3,7 @@
 # ===============================================
 from rest_framework import status, viewsets
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 
 from ..authentication import CustomJWTAuthentication
@@ -26,28 +26,34 @@ def buyandsell_list(request):
 
 
 # ==========================================
-# 🧸 2. PRODUCT VIEWSET (Seller CRUD)
+# 📦 PRODUCT VIEWSET (Public Browsing & Seller Filtering)
 # ==========================================
 class ProductViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for managing products belonging exclusively to the authenticated user.
+    ViewSet for products.
+    Allows public reading (GET) and requires authentication for mutating data (POST, PUT, DELETE).
     """
     serializer_class = ProductSerializer
-    authentication_classes = [CustomJWTAuthentication]  # 🔑 JWT Security check added!
-    permission_classes = [IsAuthenticated]
+    authentication_classes = [CustomJWTAuthentication]
+    # 🟢 TAMA: AllowAnyReadOnly para mabasa ng kahit sino, pero IsAuthenticated kapag magpo-post/edit
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get_serializer_context(self):
-        print("🐍 [DJANGO VIEW] ---- ENTER ProductViewSet.get_serializer_context() ----")
         context = super().get_serializer_context()
         context.update({"request": self.request})
         return context
 
     def get_queryset(self):
-        print("🐍 [DJANGO VIEW] ==================== ENTER ProductViewSet.get_queryset() ====================")
-        return Product.objects.filter(seller__user=self.request.user).order_by('-created_at')
+        # 🟢 Optimization + Safety Check
+        queryset = Product.objects.select_related('seller__user').prefetch_related('images').all()
+
+        # Kung may query param na ?mine=true, saka lang i-filter sa sariling items ng user
+        if self.request.query_params.get('mine') == 'true' and self.request.user.is_authenticated:
+            queryset = queryset.filter(seller__user=self.request.user)
+
+        return queryset.order_by('-created_at')
 
     def perform_create(self, serializer):
-        print("🐍 [DJANGO VIEW] ==================== ENTER ProductViewSet.perform_create() ====================")
         profile, created = Profile.objects.get_or_create(user=self.request.user)
         serializer.save(seller=profile)
 

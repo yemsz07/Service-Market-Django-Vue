@@ -144,83 +144,145 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import { useRoute } from 'vue-router';
+import api from '@/api/api';
+import wsService from '@/api/websocket';
 
-// Reactive state
-const searchQuery = ref('')
-const activeChat = ref(null)
-const newMessage = ref('')
-const messageContainer = ref(null)
+const route = useRoute();
 
-// Dynamic State – you will inject data here from your backend REST API (e.g., Django)
-const conversations = ref([
-  // Example structure:
-  // { id: 1, name: 'John Doe', lastMessage: 'Hey there!', time: '10:45 AM', unread: 2, online: true }
-])
+// States
+const searchQuery = ref('');
+const conversations = ref([]);
+const activeChat = ref(null);
+const messages = ref([]);
+const newMessage = ref('');
+const messageContainer = ref(null);
 
-// Messages for the currently active chat
-const messages = ref([
-  // Example:
-  // { id: 1, sender: 'them', text: 'Hello!', time: '10:40 AM' }
-  // { id: 2, sender: 'me', text: 'Hi!', time: '10:42 AM' }
-])
-
-// Computed: filter conversations based on search query
-const filteredConversations = computed(() => {
-  const q = searchQuery.value.toLowerCase().trim()
-  if (!q) return conversations.value
-  return conversations.value.filter(c => 
-    c.name.toLowerCase().includes(q) || 
-    (c.lastMessage && c.lastMessage.toLowerCase().includes(q))
-  )
-})
-
-// Select a chat and mark it as read
-const selectChat = (chat) => {
-  activeChat.value = chat
-  chat.unread = false
-  scrollToBottom()
-}
-
-// Send a new message
-const sendMessage = () => {
-  if (!newMessage.value.trim() || !activeChat.value) return
-
-  messages.value.push({
-    id: Date.now(),
-    sender: 'me',
-    text: newMessage.value.trim(),
-    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  })
-
-  const chat = conversations.value.find(c => c.id === activeChat.value.id)
-  if (chat) {
-    chat.lastMessage = `You: ${newMessage.value}`
-  }
-
-  newMessage.value = ''
-  scrollToBottom()
-}
-
-// Helper: get initials from a name
-const getInitials = (name) => {
-  if (!name) return 'SM'
-  return name
-    .split(' ')
-    .map(part => part[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
-}
-
-// Scroll the message container to the bottom
+// Auto-scroll pababa kapag may bagong mensahe
 const scrollToBottom = async () => {
-  await nextTick()
+  await nextTick();
   if (messageContainer.value) {
-    messageContainer.value.scrollTop = messageContainer.value.scrollHeight
+    messageContainer.value.scrollTop = messageContainer.value.scrollHeight;
   }
-}
+};
+
+// Helper: Initials para sa avatar
+const getInitials = (name) => {
+  if (!name) return '?';
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+};
+
+// Filtered Conversations List
+const filteredConversations = computed(() => {
+  if (!searchQuery.value.trim()) return conversations.value;
+  return conversations.value.filter(c => 
+    c.name.toLowerCase().includes(searchQuery.value.toLowerCase())
+  );
+});
+
+// 1. Load Conversations List mula sa API
+const loadConversations = async () => {
+  try {
+    const res = await api.get('/messages/conversations/');
+    conversations.value = res.data;
+
+    // Check query params (e.g., ?targetUserId=41&sellerName=sampleuser2)
+    const targetUserId = route.query.targetUserId;
+    const sellerName = route.query.sellerName;
+
+    if (targetUserId) {
+      let targetChat = conversations.value.find(c => String(c.targetUserId) === String(targetUserId));
+      if (!targetChat) {
+        targetChat = {
+          id: `temp_${targetUserId}`,
+          targetUserId: Number(targetUserId),
+          name: sellerName || 'Seller',
+          lastMessage: 'Say hi to start trading!',
+          time: '',
+          online: true,
+          unread: false
+        };
+        conversations.value.unshift(targetChat);
+      }
+      selectChat(targetChat);
+    }
+  } catch (err) {
+    console.error('Failed to load conversations:', err);
+  }
+};
+
+// 2. Select Chat Room (Loads History + Connects WebSocket)
+const selectChat = async (chat) => {
+  activeChat.value = chat;
+  chat.unread = false;
+
+  // Disconnect lumang WS connection
+  wsService.disconnect();
+
+  // Load Chat History (MongoDB via Django ORM API)
+  try {
+    const res = await api.get(`/messages/history/${chat.targetUserId}/`);
+    messages.value = res.data;
+    scrollToBottom();
+  } catch (err) {
+    console.error('Failed to load chat history:', err);
+    messages.value = [];
+  }
+
+  // Connect sa live WebSocket
+  connectWebSocket(chat.targetUserId);
+};
+
+// 3. Connect sa WebSocket
+const connectWebSocket = (targetUserId) => {
+  wsService.connect(`direct/${targetUserId}`);
+
+  wsService.on('message', (data) => {
+    // Pigilan ang duplicate messages
+    const exists = messages.value.some(m => String(m.id) === String(data.id));
+    if (!exists) {
+      messages.value.push({
+        id: data.id,
+        text: data.message,
+        sender: String(data.sender_id) === String(activeChat.value?.targetUserId) ? 'them' : 'me',
+        time: data.timestamp
+      });
+
+      // Update sidebar preview text
+      if (activeChat.value) {
+        activeChat.value.lastMessage = data.message;
+        activeChat.value.time = data.timestamp;
+      }
+
+      scrollToBottom();
+    }
+  });
+};
+
+// 4. Send Message via WebSocket
+const sendMessage = () => {
+  if (!newMessage.value.trim() || !activeChat.value) return;
+
+  const msgText = newMessage.value.trim();
+
+  wsService.send({
+    message: msgText
+  });
+
+  newMessage.value = '';
+};
+
+// Lifecycle Hooks
+onMounted(async () => {
+  await loadConversations();
+});
+
+onUnmounted(() => {
+  wsService.disconnect();
+});
 </script>
+
 
 <style scoped>
 *, *::before, *::after {

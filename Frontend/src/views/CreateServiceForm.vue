@@ -17,7 +17,7 @@
       <label for="description" class="font-bold">Description *</label>
       <InputText 
         id="description" 
-        v-model="form.description" 
+        v-model="form.description"    
         placeholder="Describe your service..." 
         class="w-full"
       />

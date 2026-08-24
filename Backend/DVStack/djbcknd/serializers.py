@@ -73,13 +73,19 @@ class ProductSerializer(serializers.ModelSerializer):
         validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'webp'])]
     )
     seller = serializers.PrimaryKeyRelatedField(read_only=True)
+
+    seller_user_id = serializers.ReadOnlyField(source='seller.user.id', default=None)
+    seller_username = serializers.ReadOnlyField(source='seller.user.username', default=None)
+
+
     primary_image = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
         fields = [
             'id', 'name', 'description', 'price', 'city', 'status',
-            'category', 'images', 'seller', 'image', 'primary_image'
+            'category', 'images', 'seller', 'image', 'primary_image',
+            'seller_user_id', 'seller_username'
         ]
 
     def get_primary_image(self, obj):

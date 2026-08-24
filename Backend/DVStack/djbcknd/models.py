@@ -267,8 +267,6 @@ def save_user_profile(sender, instance, **kwargs):
         instance.profile.save()
 
 
-# models.py (Idagdag sa pinakailalim)
-
 class ServiceInquiry(models.Model):
     INQUIRY_STATUS_CHOICES = (
         ('PENDING', 'Pending'),
