@@ -19,39 +19,25 @@ export const getProviderStatus = () => api.get('/check-provider-status/');
 export const getCategories = () => api.get('/categories/');
 
 export const applyAsServices = (providerData) => {
-  return api.post('/apply-as-provider/', providerData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
+  // ✅ Best Practice: Let Axios automatically set Content-Type with boundary for FormData
+  return api.post('/apply-as-provider/', providerData);
 };
-
 
 
 // --- PRODUCTS CRUD ENDPOINTS ---
 
 /**
- * Smart Save Product Function:
- * - Kapag may IPINASANG valid ID at HINDI ito temporary timestamp ID (> 1000000000000), magi-issue ng PUT request para mag-UPDATE.
- * - Kapag WALA / BAGONG item (o temporary ID lang), magi-issue ng POST request para mag-CREATE.
+ * Smart Save Product Function
  */
 export const saveProduct = (formData, id = null) => {
   const isRealBackendId = id && (typeof id !== 'number' || id < 1000000000000);
 
   if (isRealBackendId) {
     // PUT Request (Update existing item)
-    return api.put(`/products/${id}/`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    });
+    return api.put(`/products/${id}/`, formData);
   } else {
     // POST Request (Create new item)
-    return api.post('/products/', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    });
+    return api.post('/products/', formData);
   }
 };
 
@@ -59,11 +45,7 @@ export const saveProduct = (formData, id = null) => {
  * Explicit Update / PUT Product Endpoint
  */
 export const updateProduct = (id, formData) => {
-  return api.put(`/products/${id}/`, formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data'
-    }
-  });
+  return api.put(`/products/${id}/`, formData);
 };
 
 /**

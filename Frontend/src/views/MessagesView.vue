@@ -113,7 +113,7 @@
 
           <!-- Bottom Input Bar -->
           <footer class="chat-footer">
-            <form @submit.prevent="sendMessage" class="input-form">
+            <div class="input-form">
               <button type="button" class="tool-btn" title="Attach file">📎</button>
 
               <div class="input-pill">
@@ -121,13 +121,19 @@
                   v-model="newMessage" 
                   type="text" 
                   placeholder="Type a message..." 
+                  @keyup.enter="sendMessage"
                 />
               </div>
 
-              <button type="submit" class="send-btn" :disabled="!newMessage.trim()">
+              <button 
+                type="button" 
+                class="send-btn" 
+                :disabled="!newMessage.trim()"
+                @click="sendMessage"
+              >
                 Send
               </button>
-            </form>
+            </div>
           </footer>
         </template>
 
@@ -158,6 +164,8 @@ const activeChat = ref(null);
 const messages = ref([]);
 const newMessage = ref('');
 const messageContainer = ref(null);
+const currentServiceId = ref(null);
+const currentServiceName = ref(null);
 
 // Auto-scroll pababa kapag may bagong mensahe
 const scrollToBottom = async () => {
@@ -175,9 +183,10 @@ const getInitials = (name) => {
 
 // Filtered Conversations List
 const filteredConversations = computed(() => {
+  if (!conversations.value || !Array.isArray(conversations.value)) return [];
   if (!searchQuery.value.trim()) return conversations.value;
   return conversations.value.filter(c => 
-    c.name.toLowerCase().includes(searchQuery.value.toLowerCase())
+    c && c.name && c.name.toLowerCase().includes(searchQuery.value.toLowerCase())
   );
 });
 
@@ -185,11 +194,17 @@ const filteredConversations = computed(() => {
 const loadConversations = async () => {
   try {
     const res = await api.get('/messages/conversations/');
-    conversations.value = res.data;
+    conversations.value = Array.isArray(res.data) ? res.data : [];
 
-    // Check query params (e.g., ?targetUserId=41&sellerName=sampleuser2)
+    // Check query params (e.g., ?targetUserId=41&sellerName=sampleuser2&serviceId=5&serviceName=Web%20Design)
     const targetUserId = route.query.targetUserId;
     const sellerName = route.query.sellerName;
+    const serviceId = route.query.serviceId;
+    const serviceName = route.query.serviceName;
+
+    // Store service info for notifications
+    if (serviceId) currentServiceId.value = serviceId;
+    if (serviceName) currentServiceName.value = serviceName;
 
     if (targetUserId) {
       let targetChat = conversations.value.find(c => String(c.targetUserId) === String(targetUserId));
@@ -203,35 +218,42 @@ const loadConversations = async () => {
           online: true,
           unread: false
         };
-        conversations.value.unshift(targetChat);
+        conversations.value = [targetChat, ...conversations.value];
       }
-      selectChat(targetChat);
+      await selectChat(targetChat);
     }
   } catch (err) {
     console.error('Failed to load conversations:', err);
+    conversations.value = [];
   }
 };
 
 // 2. Select Chat Room (Loads History + Connects WebSocket)
 const selectChat = async (chat) => {
-  activeChat.value = chat;
-  chat.unread = false;
-
-  // Disconnect lumang WS connection
-  wsService.disconnect();
-
-  // Load Chat History (MongoDB via Django ORM API)
   try {
-    const res = await api.get(`/messages/history/${chat.targetUserId}/`);
-    messages.value = res.data;
-    scrollToBottom();
-  } catch (err) {
-    console.error('Failed to load chat history:', err);
-    messages.value = [];
-  }
+    activeChat.value = chat;
+    if (chat) chat.unread = false;
 
-  // Connect sa live WebSocket
-  connectWebSocket(chat.targetUserId);
+    // Disconnect lumang WS connection
+    wsService.disconnect();
+
+    // Load Chat History (MongoDB via Django ORM API)
+    try {
+      const res = await api.get(`/messages/history/${chat.targetUserId}/`);
+      messages.value = Array.isArray(res.data) ? res.data : [];
+      await scrollToBottom();
+    } catch (err) {
+      console.error('Failed to load chat history:', err);
+      messages.value = [];
+    }
+
+    // Connect sa live WebSocket
+    if (chat && chat.targetUserId) {
+      connectWebSocket(chat.targetUserId);
+    }
+  } catch (err) {
+    console.error('Error in selectChat:', err);
+  }
 };
 
 // 3. Connect sa WebSocket
@@ -239,23 +261,35 @@ const connectWebSocket = (targetUserId) => {
   wsService.connect(`direct/${targetUserId}`);
 
   wsService.on('message', (data) => {
-    // Pigilan ang duplicate messages
-    const exists = messages.value.some(m => String(m.id) === String(data.id));
-    if (!exists) {
-      messages.value.push({
-        id: data.id,
-        text: data.message,
-        sender: String(data.sender_id) === String(activeChat.value?.targetUserId) ? 'them' : 'me',
-        time: data.timestamp
-      });
-
-      // Update sidebar preview text
-      if (activeChat.value) {
-        activeChat.value.lastMessage = data.message;
-        activeChat.value.time = data.timestamp;
+    try {
+      // Pigilan ang duplicate messages
+      const exists = messages.value.some(m => String(m.id) === String(data.id));
+      if (!exists && data && data.id) {
+        const newMessage = {
+          id: data.id,
+          text: data.message || '',
+          sender: String(data.sender_id) === String(activeChat.value?.targetUserId) ? 'them' : 'me',
+          time: data.timestamp || ''
+        };
+        
+        // Use nextTick to ensure reactivity is properly tracked
+        nextTick(() => {
+          messages.value = [...messages.value, newMessage];
+          
+          // Update sidebar preview text
+          if (activeChat.value) {
+            activeChat.value = {
+              ...activeChat.value,
+              lastMessage: data.message || '',
+              time: data.timestamp || ''
+            };
+          }
+          
+          scrollToBottom();
+        });
       }
-
-      scrollToBottom();
+    } catch (err) {
+      console.error('[WS Message Handler Error]', err);
     }
   });
 };
@@ -267,7 +301,8 @@ const sendMessage = () => {
   const msgText = newMessage.value.trim();
 
   wsService.send({
-    message: msgText
+    message: msgText,
+    service_name: currentServiceName.value || null
   });
 
   newMessage.value = '';

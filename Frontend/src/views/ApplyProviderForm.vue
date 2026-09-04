@@ -10,17 +10,17 @@
         {{ errorMessage }}
       </Message>
 
-    <!-- Name of Service Provider -->
-    <div class="flex flex-column gap-2">
-      <label for="name" class="font-bold">Name of Service Provider</label>
-      <InputText 
-        id="name" 
-        v-model="name" 
-        placeholder="Enter your Full Name" 
-        class="w-full"
-        :disabled="isSubmitting"
-      />
-    </div>
+      <!-- Name of Service Provider -->
+      <div class="flex flex-column gap-2">
+        <label for="name" class="font-bold">Name of Service Provider</label>
+        <InputText 
+          id="name" 
+          v-model="name" 
+          placeholder="Enter your Full Name" 
+          class="w-full"
+          :disabled="isSubmitting"
+        />
+      </div>
 
       <!-- 1. Detailed Address -->
       <div class="flex flex-column gap-2">
@@ -80,7 +80,6 @@ import Message from 'primevue/message';
 import { applyAsServices } from '@/api/apis';
 
 const emit = defineEmits(['submitted']);
-const isLoading = ref(false)
 
 const name = ref('');
 const detailedAddress = ref('');
@@ -88,27 +87,6 @@ const validIdFile = ref(null);
 const providerAvatarFile = ref(null);
 const isSubmitting = ref(false);
 const errorMessage = ref('');
-
-const submitForm = async () => {
-  try {
-    isLoading.value = true
-    
-    // Dito tumatakbo ang Axios POST request mo sa backend
-    await axios.post('/provider-applications/create/', {
-      // payload data
-    })
-
-    // KAPAG SUCCESSFUL ANG API CALL:
-    // Sabihan ang Parent Component na natapos na ang submission
-    emit('submitted')
-
-  } catch (error) {
-    console.error('Error submitting application:', error)
-    alert('May nangyaring error sa pag-submit.')
-  } finally {
-    isLoading.value = false
-  }
-}
 
 const handleFileChange = (event, fieldName) => {
   const file = event.target.files[0];
@@ -130,20 +108,40 @@ const handleSubmit = async () => {
   isSubmitting.value = true;
   errorMessage.value = '';
 
+  // 📄 GUMAGAWA NG MULTIPART FORMDATA PAYLOAD
   const formData = new FormData();
   formData.append('name', name.value);
-  formData.append('detailed_address', detailedAddress.value);
+  formData.append('detailed_address', detailedAddress.value.trim());
+  
+  // Debug: Log file objects before appending
+  console.log('[DEBUG] validIdFile.value:', validIdFile.value);
+  console.log('[DEBUG] providerAvatarFile.value:', providerAvatarFile.value);
+  console.log('[DEBUG] validIdFile type:', validIdFile.value?.constructor?.name);
+  console.log('[DEBUG] providerAvatarFile type:', providerAvatarFile.value?.constructor?.name);
+  
+  // Siguraduhing totoong File instance ang ina-append
   formData.append('valid_id', validIdFile.value);
   formData.append('provider_avatar', providerAvatarFile.value);
+
+  // Debug: Log FormData contents
+  console.log('[DEBUG] FormData entries:');
+  for (let [key, value] of formData.entries()) {
+    console.log(`  ${key}:`, value, `(type: ${value?.constructor?.name})`);
+  }
 
   try {
     const response = await applyAsServices(formData);
     emit('submitted', response.data);
   } catch (error) {
-    if (error.response && error.response.data && error.response.data.error) {
-      errorMessage.value = error.response.data.error;
-    } else if (error.response && error.response.data && error.response.data.detail) {
-      errorMessage.value = error.response.data.detail;
+    console.error('Submission error details:', error.response?.data);
+    if (error.response && error.response.data && error.response.data.details) {
+      // Kunin ang specific field errors mula sa bagong Django validation response
+      const details = error.response.data.details;
+      const firstError = Object.values(details)[0];
+      errorMessage.value = firstError || 'May validation error sa iyong submission.';
+    } else if (error.response && error.response.data && error.response.data.message) {
+      // Display user-friendly message for ALREADY_PENDING, ALREADY_APPROVED, etc.
+      errorMessage.value = error.response.data.message;
     } else {
       errorMessage.value = 'Nagkaroon ng problema sa pagpapadala ng application. Pakisubukan ulit.';
     }

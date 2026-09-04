@@ -3,38 +3,42 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.db.models import Q
 from django.contrib.auth import get_user_model
-from chatapp.models import DirectMessage  # O paliitan ayon sa path ng Message model mo
+from asgiref.sync import async_to_sync, sync_to_async
+from chatapp.models import DirectMessage
 
 User = get_user_model()
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_conversations(request):
-    current_user = request.user
+# ==========================================
+# NON-BLOCKING DATABASE QUERY HELPERS
+# ==========================================
 
-    # Kukunin ang mga huling mensahe sa pagitan ni request.user at ibang users
-    messages = DirectMessage.objects.filter(
-        Q(sender_id=current_user.id) | Q(recipient_id=current_user.id)
-    ).order_by('-timestamp')
+@sync_to_async
+def fetch_conversations_data(authenticated_user_id):
+    # 1. Direct non-blocking fetch from MongoDB
+    messages = list(
+        DirectMessage.objects.using('mongodb').filter(
+            Q(sender_id=authenticated_user_id) | Q(recipient_id=authenticated_user_id)
+        ).order_by('-timestamp')[:100]
+    )
 
+    if not messages:
+        return []
+
+    # 2. Extract unique chat partners
+    user_ids = {
+        msg.sender_id if msg.sender_id != authenticated_user_id else msg.recipient_id 
+        for msg in messages
+    }
+
+    # 3. Explicit query to PostgreSQL for User Auth profiles
+    users = {user.id: user for user in User.objects.using('default').filter(id__in=user_ids)}
+
+    # 4. Format payload
     conversations_dict = {}
-    user_ids = set()
-    
-    # Collect all unique user IDs from messages
     for msg in messages:
-        if msg.sender_id != current_user.id:
-            user_ids.add(msg.sender_id)
-        if msg.recipient_id != current_user.id:
-            user_ids.add(msg.recipient_id)
-    
-    # Fetch all users from PostgreSQL in a single query
-    users = {user.id: user for user in User.objects.filter(id__in=user_ids)}
-    
-    for msg in messages:
-        # Use ID fields directly instead of accessing related objects
-        other_user_id = msg.recipient_id if msg.sender_id == current_user.id else msg.sender_id
+        other_user_id = msg.recipient_id if msg.sender_id == authenticated_user_id else msg.sender_id
         other_user = users.get(other_user_id)
-        
+
         if other_user and other_user_id not in conversations_dict:
             conversations_dict[other_user_id] = {
                 'id': f"conv_{other_user_id}",
@@ -46,28 +50,46 @@ def get_conversations(request):
                 'unread': False
             }
 
-    return Response(list(conversations_dict.values()))
+    return list(conversations_dict.values())
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_chat_history(request, user_id):
-    current_user = request.user
+@sync_to_async
+def fetch_chat_history_data(authenticated_user_id, target_user_id):
+    # Strict boundary check: User can only read messages involving themselves
+    messages = list(
+        DirectMessage.objects.using('mongodb').filter(
+            (Q(sender_id=authenticated_user_id) & Q(recipient_id=target_user_id)) |
+            (Q(sender_id=target_user_id) & Q(recipient_id=authenticated_user_id))
+        ).order_by('timestamp')
+    )
 
-    # Kukunin ang chat history sa pagitan ng dalawang user
-    messages = DirectMessage.objects.filter(
-        (Q(sender=current_user) & Q(recipient_id=user_id)) |
-        (Q(sender_id=user_id) & Q(recipient=current_user))
-    ).order_by('timestamp')
-
-    data = [
+    return [
         {
             'id': str(msg.id),
             'text': msg.message,
-            'sender': 'me' if msg.sender_id == current_user.id else 'them',
+            'sender': 'me' if msg.sender_id == authenticated_user_id else 'them',
             'time': msg.timestamp.strftime('%H:%M')
         }
         for msg in messages
     ]
 
+
+# ==========================================
+# SAFE SYNC DRF VIEWS (ASGI-COMPATIBLE)
+# ==========================================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_conversations(request):
+    authenticated_user_id = request.user.id
+    # Executes async MongoDB query synchronously without blocking the ASGI event loop
+    data = async_to_sync(fetch_conversations_data)(authenticated_user_id)
+    return Response(data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_chat_history(request, user_id):
+    authenticated_user_id = request.user.id
+    data = async_to_sync(fetch_chat_history_data)(authenticated_user_id, target_user_id=user_id)
     return Response(data)

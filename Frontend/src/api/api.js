@@ -4,9 +4,19 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL, 
   timeout: 10000,
   withCredentials: true, // IMPORTANT: Pinapayagan nito ang Axios na ipadala at tanggapin ang HttpOnly cookies
-  headers: {
-    'Content-Type': 'application/json',
+  // Remove default Content-Type to let Axios handle it automatically for FormData
+});
+
+// Request interceptor to handle FormData properly
+api.interceptors.request.use((config) => {
+  // If data is FormData, let Axios set Content-Type with boundary automatically
+  if (config.data instanceof FormData) {
+    // Remove the default Content-Type header to allow Axios to set it with boundary
+    delete config.headers['Content-Type'];
   }
+  return config;
+}, (error) => {
+  return Promise.reject(error);
 });
 
 // 🟢 NAGDAGDAG NG "export" DITO:

@@ -31,18 +31,18 @@
           <Card class="product-card shadow-1 border-round-xl overflow-hidden h-full hover:shadow-4 transition-duration-300">
             
             <template #header>
-              <!-- 1. Seller Info Header -->
-              <div class="seller-header px-3 pt-3 pb-2 flex align-items-center gap-2">
-                <img 
-                  :src="product.seller?.avatar || 'https://placehold.co/32x32?text=U'" 
-                  class="seller-avatar" 
-                  alt="avatar" 
-                />
-                <div class="seller-meta flex flex-column">
-                  <span class="seller-name">{{ product.seller?.username || 'ServiceMarket User' }}</span>
-                  <span class="seller-time">Kani-kanina lang</span>
-                </div>
+              <!-- Seller Info Header -->
+            <div class="seller-header px-3 pt-3 pb-2 flex align-items-center gap-2">
+              <img 
+                :src="product.seller_avatar || 'https://placehold.co/32x32?text=U'" 
+                class="seller-avatar" 
+                alt="avatar" 
+              />
+              <div class="seller-meta flex flex-column">
+                <span class="seller-name">{{ product.seller_username || 'ServiceMarket User' }}</span>
+                <span class="seller-time">Kani-kanina lang</span>
               </div>
+            </div>
 
               <!-- 2. Product Image -->
               <div class="img-wrapper">
@@ -69,12 +69,12 @@
                 </div>
 
                 <!-- Chat Seller Button -->
-                <Button 
-                  label="Chat Seller" 
+               <Button 
+                  :label="!currentUserId ? 'Log in to Chat' : 'Chat Seller'" 
                   icon="pi pi-comments" 
                   class="p-button-outlined p-button-sm w-full mt-2" 
-                  :disabled="!product.seller_user_id || currentUserId === product.seller_user_id"
-                  @click="openChat(product.seller_user_id, product.seller_username)" 
+                  :disabled="!currentUserId || !product.seller_user_id || currentUserId === product.seller_user_id"
+                  @click="!currentUserId ? router.push({ name: 'login' }) : openChat(product.seller_user_id, product.seller_username)" 
                 />
               </div>
             </template>
@@ -115,23 +115,13 @@ function getProductImage(product) {
 
 // Handler para sa pag-chat sa seller
 const openChat = (sellerId, sellerUsername) => {
-  console.log('DEBUG OPENCHAT:', {
-    sellerId: sellerId,
-    currentUserId: currentUserId.value,
-    typeOfSellerId: typeof sellerId,
-    typeOfCurrentUser: typeof currentUserId.value
-  });
-  
   const myId = Number(currentUserId.value);
   const targetSellerId = Number(sellerId);
 
-  // Pigilan kung walang seller ID o kung sarili mong product
   if (!sellerId || myId === targetSellerId) {
-    console.warn('Cannot open chat with yourself or invalid seller.');
     return;
   }
 
-  // Redirect papuntang Messages view gamit ang Target Seller ID
   router.push({
     name: 'messages',
     query: { 
@@ -160,9 +150,9 @@ const fetchProducts = async () => {
   try {
     const response = await api.get('/buyandsell/');
     products.value = response.data;
-    console.log('PRODUCTS DATA:', response.data[0]);
   } catch (error) {
-    console.error('Error fetching products:', error); 
+    console.error('Error fetching products:', error); // okay ka lang mag-iwan nito, useful sa error tracking
+    // TODO: magdagdag ng error state/toast para makita ng user
   } finally {
     isLoading.value = false; 
   }
@@ -261,6 +251,7 @@ onMounted(async () => {
 }
 
 .p-button-outlined:hover {
-  background-color: #fdf2f2 !important;
+  background-color: #c86d64 !important;
+  color: #fff !important;
 }
 </style>

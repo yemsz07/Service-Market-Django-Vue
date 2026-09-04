@@ -19,14 +19,20 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'bcknd.settings')
 django_asgi_app = get_asgi_application()
 
 from channels.routing import ProtocolTypeRouter, URLRouter
+from channels.auth import AuthMiddlewareStack
+from channels.sessions import CookieMiddleware, SessionMiddleware
 from chatapp.middleware import JWTAuthMiddlewareStack
 import chatapp.routing
 
 application = ProtocolTypeRouter({
     "http": django_asgi_app,
-    "websocket": JWTAuthMiddlewareStack(
-        URLRouter(
-            chatapp.routing.websocket_urlpatterns
+    "websocket": CookieMiddleware(
+        SessionMiddleware(
+            JWTAuthMiddlewareStack(
+                URLRouter(
+                    chatapp.routing.websocket_urlpatterns
+                )
+            )
         )
     ),
 })

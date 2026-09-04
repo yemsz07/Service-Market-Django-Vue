@@ -46,6 +46,13 @@ from .views.message_views import (
     get_chat_history
 )
 
+# 7. Notifications (views/notification_views.py)
+from .views.notification_views import (
+    get_notifications,
+    mark_notification_read,
+    mark_all_notifications_read
+)
+
 # Router Setup para sa ViewSets
 router = DefaultRouter()
 router.register(r'products', ProductViewSet, basename='product')
@@ -80,6 +87,11 @@ urlpatterns = [
     path('messages/conversations/', get_conversations, name='get-conversations'),
     path('messages/history/<int:user_id>/', get_chat_history, name='get-chat-history'),
 
-    # 📦 ROUTER URLS (ProductViewSet)
+    # � NOTIFICATIONS ENDPOINTS
+    path('notifications/', get_notifications, name='get-notifications'),
+    path('notifications/<int:notification_id>/read/', mark_notification_read, name='mark-notification-read'),
+    path('notifications/mark-all-read/', mark_all_notifications_read, name='mark-all-notifications-read'),
+
+    # �📦 ROUTER URLS (ProductViewSet)
     path('', include(router.urls)),
 ]

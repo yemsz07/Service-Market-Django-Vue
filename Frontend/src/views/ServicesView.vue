@@ -19,18 +19,23 @@
           v-for="service in services" 
           :key="service.id" 
           class="service-card" 
-          @click="openServiceDetail(service)"
         >
-          <!-- Card Image placeholder -->
-          <div class="card-image-placeholder">
-            <i class="pi pi-briefcase" style="font-size: 3rem; color: #d88b8b;"></i>
+          <!-- 📸 TOTOONG IMAGE TAG (May Fallback Icon kung Walang Image) -->
+          <div class="card-image-placeholder" @click="openServiceDetail(service)">
+            <img 
+              v-if="service.image" 
+              :src="getImageUrl(service.image)" 
+              :alt="service.name"
+              class="service-card-img"
+              @error="onImageError"
+            />
+            <i v-else class="pi pi-briefcase" style="font-size: 3rem; color: #d88b8b;"></i>
           </div>
 
-                    <!-- Card Content -->
+          <!-- Card Content -->
           <div class="card-main-content">
-            <h4 class="service-name">{{ service.name }}</h4>
+            <h4 class="service-name" @click="openServiceDetail(service)">{{ service.name }}</h4>
             
-            <!-- ✅ BAGONG NILAGAY: Pangalan ng Provider/User -->
             <p class="service-provider">
               <i class="pi pi-user" style="font-size: 0.8rem;"></i> 
               Posted by: <strong>{{ service.provider_name || 'Unknown User' }}</strong>
@@ -44,6 +49,15 @@
                 {{ service.status }}
               </span>
             </div>
+
+            <!-- Chat Provider Button -->
+            <Button 
+              :label="!currentUserId ? 'Log in to Chat' : 'Chat Provider'" 
+              icon="pi pi-comments" 
+              class="p-button-outlined p-button-sm w-full mt-2" 
+              :disabled="!currentUserId || !service.provider_user_id || currentUserId === service.provider_user_id"
+              @click="!currentUserId ? router.push({ name: 'login' }) : openChat(service.provider_user_id, service.provider_name, service.id, service.name)" 
+            />
           </div>
 
         </div>
@@ -68,11 +82,18 @@
     >
       <div v-if="selectedService" class="dialog-content">
         
+        <!-- Image Preview sa Dialog -->
+        <div v-if="selectedService.image" class="dialog-image-container">
+          <img :src="getImageUrl(selectedService.image)" :alt="selectedService.name" class="dialog-service-img" />
+        </div>
+
         <div class="dialog-section card-author-header">
-          <div class="avatar-circle">U</div>
+          <div class="avatar-circle">
+            {{ (selectedService.provider_name || 'U')[0].toUpperCase() }}
+          </div>
           <div class="author-details">
-            <span class="author-name">{{ selectedService.user_email || 'ServiceMarket User' }}</span>
-            <span class="author-city">Member since [Insert Date]</span>
+            <span class="author-name">{{ selectedService.provider_name || 'ServiceMarket User' }}</span>
+            <span class="author-city">Service Provider</span>
           </div>
         </div>
 
@@ -99,8 +120,8 @@
         </div>
 
         <div class="dialog-section pricing">
-          <span class="price-value">₱122</span>
-          <span class="price-type">Per Hour</span>
+          <span class="price-value">₱{{ selectedService.price }}</span>
+          <span class="price-type">Per Service / Hour</span>
         </div>
 
       </div>
@@ -111,24 +132,79 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import Dialog from 'primevue/dialog';
+import Button from 'primevue/button';
 import api from '../api/api';
+
+const router = useRouter();
 
 // Data state
 const services = ref([]);
 const loading = ref(true);
+const currentUserId = ref(null);
 
 // Popup state
 const displayServiceDetail = ref(false);
 const selectedService = ref(null);
 
+const API_BASE_URL = 'http://127.0.0.1:8000'; // Django backend address
+
+// Helper function para sa Image URL handling
+const getImageUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
+  return `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+};
+
+// Fallback kung sira/broken ang image URL
+const onImageError = (event) => {
+  event.target.style.display = 'none';
+};
+
+// Handler para sa pag-chat sa provider
+const openChat = (providerId, providerName, serviceId = null, serviceName = null) => {
+  const myId = Number(currentUserId.value);
+  const targetProviderId = Number(providerId);
+
+  if (!providerId || myId === targetProviderId) {
+    return;
+  }
+
+  router.push({
+    name: 'messages',
+    query: { 
+      targetUserId: targetProviderId,
+      sellerName: providerName,
+      serviceId: serviceId,
+      serviceName: serviceName
+    }
+  });
+};
+
+// Fetch Auth Status
+const checkAuth = async () => {
+  try {
+    const response = await api.get('/check-auth/');
+    if (response.data && response.data.user) {
+      currentUserId.value = response.data.user.id;
+    }
+  } catch (error) {
+    console.warn('User is not authenticated:', error);
+    currentUserId.value = null;
+  }
+};
+
 // Fetch service data from Django API
 const fetchService = async () => {
   try {
     const response = await api.get('/services/');
-    services.value = response.data;
+    services.value = response.data || response.data.results || [];
   } catch (error) {
     console.error('Error fetching data:', error);
+    services.value = [];
   } finally {
     loading.value = false;
   }
@@ -140,7 +216,10 @@ const openServiceDetail = (service) => {
   displayServiceDetail.value = true;
 };
 
-onMounted(fetchService);
+onMounted(async () => {
+  await checkAuth();
+  await fetchService();
+});
 </script>
 
 <style scoped>
@@ -386,5 +465,36 @@ onMounted(fetchService);
   gap: 0.25rem;
 }
 
+/* Matching Button Color to Logo Palette */
+.p-button-outlined {
+  color: #c86d64 !important;
+  border-color: #c86d64 !important;
+}
+
+.p-button-outlined:hover {
+  background-color: #c86d64 !important;
+  color: #fff !important;
+}
+
+.service-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Styling para sa Image sa loob ng Popup Dialog */
+.dialog-image-container {
+  width: 100%;
+  height: 220px;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.dialog-service-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 
 </style>

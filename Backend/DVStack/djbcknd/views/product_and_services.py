@@ -30,12 +30,16 @@ def buyandsell_list(request):
 @permission_classes([IsAuthenticated])              # 🔒 Require login
 def service_list(request):
     """
-    Returns a list of all available services.
+    Returns a list of all available services from APPROVED providers only.
     """
     print("🐍 [DJANGO VIEW] ==================== ENTER service_list() ====================")
     print(f"🐍 [DJANGO VIEW] Request method: {request.method}")
 
-    services = Service.objects.all().order_by('-created_at')
+    # Only show services from APPROVED providers
+    services = Service.objects.filter(
+        provider__approval_status='APPROVED'
+    ).order_by('-created_at')
+    
     print(f"🐍 [DJANGO VIEW] Fetched services queryset count: {services.count()}")
 
     # 💡 Sinamahan ng context={'request': request} para sa full image URLs

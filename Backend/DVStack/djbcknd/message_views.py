@@ -3,7 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.db.models import Q
 from django.contrib.auth import get_user_model
-from chatapp.models import DirectMessage  # O paliitan ayon sa path ng Message model mo
+from chatapp.models import DirectMessage 
 
 User = get_user_model()
 
@@ -12,10 +12,10 @@ User = get_user_model()
 def get_conversations(request):
     current_user = request.user
 
-    # Kukunin ang mga huling mensahe sa pagitan ni request.user at ibang users
+    # 1. Nagdagdag ng select_related para sa database optimization
     messages = DirectMessage.objects.filter(
         Q(sender=current_user) | Q(recipient=current_user)
-    ).order_by('-timestamp')
+    ).select_related('sender', 'recipient').order_by('-timestamp')
 
     conversations_dict = {}
     
@@ -29,7 +29,7 @@ def get_conversations(request):
                 'name': other_user.username,
                 'lastMessage': msg.message,
                 'time': msg.timestamp.strftime('%H:%M'),
-                'online': True,
+                'online': False,  # Gawing dynamic kapag may WebSocket status tracking ka na
                 'unread': False
             }
 
@@ -41,10 +41,10 @@ def get_conversations(request):
 def get_chat_history(request, user_id):
     current_user = request.user
 
-    # Kukunin ang chat history sa pagitan ng dalawang user
+    # 2. In-optimize ang filtering gamit ang _id fields direkta
     messages = DirectMessage.objects.filter(
-        (Q(sender=current_user) & Q(recipient_id=user_id)) |
-        (Q(sender_id=user_id) & Q(recipient=current_user))
+        (Q(sender_id=current_user.id) & Q(recipient_id=user_id)) |
+        (Q(sender_id=user_id) & Q(recipient_id=current_user.id))
     ).order_by('timestamp')
 
     data = [

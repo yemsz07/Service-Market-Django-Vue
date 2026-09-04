@@ -13,7 +13,7 @@ from django.contrib.auth.models import User
 from django.core.validators import FileExtensionValidator
 from rest_framework import serializers
 
-from .models import Category, Product, ProductImage, Service, ServiceInquiry, ServiceProviderProfile, Profile
+from .models import Category, Product, ProductImage, Service, ServiceInquiry, ServiceProviderProfile, Profile, Notification
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +76,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
     seller_user_id = serializers.ReadOnlyField(source='seller.user.id', default=None)
     seller_username = serializers.ReadOnlyField(source='seller.user.username', default=None)
-
+    seller_avatar = serializers.SerializerMethodField()
 
     primary_image = serializers.SerializerMethodField()
 
@@ -85,8 +85,20 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'description', 'price', 'city', 'status',
             'category', 'images', 'seller', 'image', 'primary_image',
-            'seller_user_id', 'seller_username'
+            'seller_user_id', 'seller_username', 'seller_avatar',
         ]
+
+ 
+    def get_seller_avatar(self, obj):
+        """
+        Ligtas na kinukuha ang avatar URL ng seller gamit ang null-checks.
+        """
+        if hasattr(obj, 'seller') and obj.seller and getattr(obj.seller, 'avatar', None):
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.seller.avatar.url)
+            return obj.seller.avatar.url
+        return None
 
     def get_primary_image(self, obj):
         first_img = obj.images.first()
@@ -124,6 +136,9 @@ class ServiceSerializer(serializers.ModelSerializer):
     )
 
     provider_name = serializers.CharField(source='provider.profile.user.username', read_only=True)
+    provider_user_id = serializers.IntegerField(source='provider.profile.user.id', read_only=True)
+    provider_avatar = serializers.CharField(source='provider.provider_avatar', read_only=True)
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = Service
@@ -137,17 +152,31 @@ class ServiceSerializer(serializers.ModelSerializer):
             'status', 
             'category', 
             'provider', 
-            'provider_name', 
+            'provider_name',
+            'provider_user_id',
+            'provider_avatar',
+            'image',
             'created_at', 
             'updated_at'
         ]
+
+    def get_image(self, obj):
+        # Kung ang Service model ay may related_name na 'images' para sa ServiceImage
+        first_img = getattr(obj, 'images', None)
+        if first_img:
+            img_obj = first_img.first()
+            if img_obj and img_obj.image:
+                request = self.context.get('request')
+                if request:
+                    return request.build_absolute_uri(img_obj.image.url)
+                return img_obj.image.url
+        return None
 
 class CreateServiceSerializer(serializers.ModelSerializer):
     """
     Serializes Service creation with Category ID.
     ✅ CHANGED: Now accepts Category ID instead of string name.
     """
-    # ✅ ONLY CHANGE: Category uses ID (Primary Key) instead of string name
     category = serializers.PrimaryKeyRelatedField(
         queryset=Category.objects.filter(category_type='SERVICE'),
         required=True,
@@ -237,3 +266,28 @@ class UserProfileStatusSerializer(serializers.ModelSerializer):
         if hasattr(obj, 'service_profile'):
             return obj.service_profile.approval_status
         return None
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Notification model.
+    """
+    sender_name = serializers.CharField(source='sender.username', read_only=True)
+    
+
+    class Meta:
+        model = Notification
+        fields = [
+            'id',
+            'notification_type',
+            'title',
+            'message',
+            'sender',
+            'sender_name',
+            'service',
+            'service_name', 
+            'inquiry',
+            'is_read',
+            'created_at'
+        ]
+        read_only_fields = ['created_at']

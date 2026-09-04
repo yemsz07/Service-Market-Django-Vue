@@ -11,42 +11,39 @@
           <i class="pi pi-refresh" :class="{ 'pi-spin': loading }"></i> Refresh
         </button>
 
-        <!-- 🚀 UPDATED: Pinatatakbo na ang status check function sa halip na direktang buksan ang modal -->
         <button class="create-btn" @click="handleCreateServiceClick" :disabled="checkingStatus">
           <i class="pi" :class="checkingStatus ? 'pi-spin pi-spinner' : 'pi-plus'"></i> Create Service
         </button>
 
-        <!-- 🚀 1. APPLY / PROVIDER VERIFICATION MODAL DIALOG -->
-      <Dialog 
-        v-model:visible="showCreateModal" 
-        header="Create New Service"
-        :modal="true"
-        :style="{ width: '50vw' }"
-      >
-        <!-- Pinalitan na ng Child Component! -->
-        <CreateServiceForm 
-          :categories="categories" 
-          @submitted="handleSuccess" 
-          @close="showCreateModal = false" 
-        />
-      </Dialog>
+        <!-- CREATE SERVICE MODAL -->
+        <Dialog 
+          v-model:visible="showCreateModal" 
+          header="Create New Service"
+          :modal="true"
+          :style="{ width: '50vw' }"
+        >
+          <CreateServiceForm 
+            :categories="categories" 
+            @submitted="handleSuccess" 
+            @close="showCreateModal = false" 
+          />
+        </Dialog>
 
-      <Dialog 
-        v-model:visible="showApplyModal" 
-        header="Apply as Service Provider" 
-        :style="{ width: '50vw' }" 
-        :breakpoints="{ '960px': '75vw', '641px': '90vw' }" 
-        :modal="true" 
-        :draggable="false"
-        class="p-fluid"
-      >
-        <ApplyProviderForm @submitted="handleApplicationSubmitted" />
-      </Dialog>
-
+        <!-- APPLY PROVIDER MODAL -->
+        <Dialog 
+          v-model:visible="showApplyModal" 
+          header="Apply as Service Provider" 
+          :style="{ width: '50vw' }" 
+          :breakpoints="{ '960px': '75vw', '641px': '90vw' }" 
+          :modal="true" 
+          :draggable="false"
+          class="p-fluid"
+        >
+          <ApplyProviderForm @submitted="handleApplicationSubmitted" />
+        </Dialog>
       </div>
     </div>
     
-
     <!-- Summary Stats Bar -->
     <div class="stats-overview">
       <div class="stat-card">
@@ -65,12 +62,18 @@
           {{ inquiries.filter(i => i.status === 'responded').length }}
         </span>
       </div>
+      <div class="stat-card notification-card">
+        <span class="stat-label">New Messages</span>
+        <span class="stat-value text-notification">
+          {{ unreadNotificationCount }}
+        </span>
+      </div>
     </div>
 
-    <!-- Main Table Container -->
+    <!-- Existing Single Main Table Container -->
     <div class="table-card">
       <DataTable 
-        :value="inquiries" 
+        :value="tableData" 
         :loading="loading"
         paginator 
         :rows="10"
@@ -83,31 +86,43 @@
         <template #empty>
           <div class="empty-table">
             <i class="pi pi-inbox"></i>
-            <p>No client inquiries found yet.</p>
+            <p>No inquiries or notifications found yet.</p>
           </div>
         </template>
 
+        <!-- Column: Type -->
+        <Column field="type" header="Type" sortable>
+          <template #body="slotProps">
+            <span v-if="slotProps.data.type === 'inquiry'" class="type-badge inquiry-badge">
+              <i class="pi pi-envelope mr-1"></i> Inquiry
+            </span>
+            <span v-else class="type-badge notification-badge">
+              <i class="pi pi-bell mr-1"></i> Message
+            </span>
+          </template>
+        </Column>
+
         <!-- Column: Client Name -->
-        <Column field="client_name" header="Client Name" sortable>
+        <Column field="client_name" header="From" sortable>
           <template #body="slotProps">
             <div class="client-info-cell">
               <div class="avatar-sm">
                 {{ getInitial(slotProps.data.client_name || slotProps.data.client_email) }}
               </div>
               <div>
-                <span class="font-bold block">{{ slotProps.data.client_name || 'Anonymous Client' }}</span>
-                <span class="text-xs text-muted">{{ slotProps.data.client_email }}</span>
+                <span class="font-bold block">{{ slotProps.data.client_name || 'Anonymous' }}</span>
+                <span v-if="slotProps.data.client_email" class="text-xs text-muted">{{ slotProps.data.client_email }}</span>
               </div>
             </div>
           </template>
         </Column>
 
-        <!-- Column: Service Requested -->
-        <Column field="service_name" header="Service Inquired" sortable>
+        <!-- Column: Service/Message -->
+        <Column field="service_name" header="Subject" sortable>
           <template #body="slotProps">
             <span class="service-badge">
               <i class="pi pi-briefcase mr-1"></i>
-              {{ slotProps.data.service_title || slotProps.data.service_name || 'General Inquiry' }}
+              {{ slotProps.data.service_name }}
             </span>
           </template>
         </Column>
@@ -122,7 +137,7 @@
         </Column>
 
         <!-- Column: Date Received -->
-        <Column field="created_at" header="Date Received" sortable>
+        <Column field="created_at" header="Date" sortable>
           <template #body="slotProps">
             {{ formatDate(slotProps.data.created_at) }}
           </template>
@@ -131,8 +146,11 @@
         <!-- Column: Status -->
         <Column field="status" header="Status" sortable>
           <template #body="slotProps">
-            <span class="status-pill" :class="slotProps.data.status?.toLowerCase()">
+            <span v-if="slotProps.data.type === 'inquiry'" class="status-pill" :class="slotProps.data.status?.toLowerCase()">
               {{ slotProps.data.status || 'Pending' }}
+            </span>
+            <span v-else class="status-pill" :class="{ 'unread': !slotProps.data.is_read }">
+              {{ slotProps.data.is_read ? 'Read' : 'New' }}
             </span>
           </template>
         </Column>
@@ -140,9 +158,13 @@
         <!-- Column: Action -->
         <Column header="Action">
           <template #body="slotProps">
-            <button class="view-btn" @click.stop="openInquiryDetail(slotProps.data)">
+            <button v-if="slotProps.data.type === 'inquiry'" class="view-btn" @click.stop="openInquiryDetail(slotProps.data)">
               View Details
             </button>
+            <button v-else-if="!slotProps.data.is_read" class="mark-read-btn-small" @click.stop="markAsRead(slotProps.data.id)">
+              Mark Read
+            </button>
+            <span v-else class="text-muted text-xs">-</span>
           </template>
         </Column>
       </DataTable>
@@ -216,7 +238,7 @@
 
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, onUnmounted } from 'vue';
 import api from '../api/api';
 
 // PrimeVue Components
@@ -233,6 +255,13 @@ const inquiries = ref([]);
 const loading = ref(true);
 const displayDialog = ref(false);
 const selectedInquiry = ref(null);
+
+// Combined data for table (inquiries + notifications)
+const tableData = ref([]);
+
+// WebSocket connection
+let notificationSocket = null;
+const currentUserId = ref(null);
 
 // Create Service Modal & Form States
 const showCreateModal = ref(false); 
@@ -254,6 +283,12 @@ const showApplyModal = ref(false);
 const providerStatus = ref(null); 
 const checkingStatus = ref(false);
 
+// Notification States
+const notifications = ref([]);
+const loadingNotifications = ref(false);
+const unreadNotificationCount = ref(0);
+const markingAsRead = ref(false);
+
 // --- HANDLERS & FUNCTIONS ---
 
 const onFileSelect = (event) => {
@@ -270,10 +305,169 @@ const fetchInquiries = async () => {
   try {
     const response = await api.get('get-inquiries/');
     inquiries.value = response.data;
+    updateTableData();
   } catch (error) {
     console.error('Error fetching client inquiries:', error);
   } finally {
     loading.value = false;
+  }
+};
+
+// Fetch current user ID
+const fetchCurrentUserId = async () => {
+  try {
+    const response = await api.get('/check-auth/');
+    if (response.data && response.data.user) {
+      currentUserId.value = response.data.user.id;
+    }
+  } catch (error) {
+    console.warn('Error fetching current user:', error);
+  }
+};
+
+const connectNotificationSocket = () => {
+  if (!currentUserId.value) {
+    console.warn('[NOTIFICATION WS] No user ID, cannot connect to WebSocket');
+    return;
+  }
+
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  
+  // 🚀 DAPAT PORT 8000 ANG KINAKAUSAP (Django ASGI/Channels)
+  const host = '127.0.0.1:8000'; 
+  const wsUrl = `${protocol}//${host}/ws/notifications/`;
+
+  console.log(`[NOTIFICATION WS] Connecting to: ${wsUrl}`);
+
+  notificationSocket = new WebSocket(wsUrl);
+
+  notificationSocket.onopen = () => {
+    console.log('[NOTIFICATION WS] Connected successfully');
+  };
+
+  notificationSocket.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      console.log('[NOTIFICATION WS] Received:', data);
+
+      if (data.type === 'notification' && data.data) {
+        // Add new notification to the beginning of the array
+        const newNotification = {
+          type: 'notification',
+          id: data.data.id || Date.now(),
+          client_name: data.data.sender_name || 'System',
+          client_email: '',
+          service_name: data.data.service_name || 'Message',
+          message: data.data.message,
+          created_at: data.data.created_at || new Date().toISOString(),
+          status: 'New',
+          is_read: false
+        };
+
+        notifications.value.unshift(newNotification);
+        unreadNotificationCount.value++;
+        updateTableData();
+      }
+    } catch (error) {
+      console.error('[NOTIFICATION WS] Error parsing message:', error);
+    }
+  };
+
+  notificationSocket.onerror = (error) => {
+    console.error('[NOTIFICATION WS] Error:', error);
+  };
+
+  notificationSocket.onclose = () => {
+    console.log('[NOTIFICATION WS] Disconnected');
+  };
+};
+
+// Disconnect WebSocket
+const disconnectNotificationSocket = () => {
+  if (notificationSocket) {
+    notificationSocket.close();
+    notificationSocket = null;
+  }
+};
+
+// Fetch Notifications
+const fetchNotifications = async () => {
+  loadingNotifications.value = true;
+  try {
+    const response = await api.get('/notifications/');
+    notifications.value = response.data.notifications || [];
+    unreadNotificationCount.value = response.data.unread_count || 0;
+    updateTableData();
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+  } finally {
+    loadingNotifications.value = false;
+  }
+};
+
+// Combine inquiries and notifications into single table data
+const updateTableData = () => {
+  // Convert inquiries to table format
+  const inquiryRows = inquiries.value.map(inquiry => ({
+    type: 'inquiry',
+    id: inquiry.id,
+    client_name: inquiry.client_name,
+    client_email: inquiry.client_email,
+    service_name: inquiry.service_title || inquiry.service_name,
+    message: inquiry.message,
+    created_at: inquiry.created_at,
+    status: inquiry.status,
+    is_read: true // Inquiries don't have read status
+  }));
+
+  // Convert notifications to table format
+  const notificationRows = notifications.value.map(notification => ({
+    type: 'notification',
+    id: notification.id,
+    client_name: notification.sender_name,
+    client_email: '',
+    service_name: notification.service_name || 'Message',
+    message: notification.message,
+    created_at: notification.created_at,
+    status: notification.is_read ? 'Read' : 'New',
+    is_read: notification.is_read
+  }));
+
+  // Combine and sort by date (newest first)
+  tableData.value = [...inquiryRows, ...notificationRows].sort((a, b) => 
+    new Date(b.created_at) - new Date(a.created_at)
+  );
+};
+
+// Mark single notification as read
+const markAsRead = async (notificationId) => {
+  try {
+    await api.post(`/notifications/${notificationId}/read/`);
+    // Update local state
+    const notification = notifications.value.find(n => n.id === notificationId);
+    if (notification) {
+      notification.is_read = true;
+      unreadNotificationCount.value = Math.max(0, unreadNotificationCount.value - 1);
+      updateTableData();
+    }
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+  }
+};
+
+// Mark all notifications as read
+const markAllAsRead = async () => {
+  markingAsRead.value = true;
+  try {
+    await api.post('/notifications/mark-all-read/');
+    // Update local state
+    notifications.value.forEach(n => n.is_read = true);
+    unreadNotificationCount.value = 0;
+    updateTableData();
+  } catch (error) {
+    console.error('Error marking all notifications as read:', error);
+  } finally {
+    markingAsRead.value = false;
   }
 };
 
@@ -351,10 +545,38 @@ const formatDate = (dateString) => {
   });
 };
 
-// ✅ CHANGE 3: Fetch BOTH inquiries AND categories when the page loads
+const formatNotificationTime = (dateString) => {
+  if (!dateString) return 'N/A';
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric'
+  });
+};
+
+// ✅ CHANGE 3: Fetch data and connect WebSocket when the page loads
 onMounted(async () => {
+  await fetchCurrentUserId();
   await fetchInquiries();
   await fetchCategories();
+  await fetchNotifications();
+  connectNotificationSocket();
+});
+
+// Disconnect WebSocket when component unmounts
+onUnmounted(() => {
+  disconnectNotificationSocket();
 });
 </script>
 
@@ -466,6 +688,53 @@ onMounted(async () => {
 
 .text-warning { color: #d97706; }
 .text-success { color: #16a34a; }
+.text-notification { color: #c86d64; }
+
+/* Type Badges */
+.type-badge {
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+}
+
+.inquiry-badge {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.notification-badge {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-pill.unread {
+  background: #c86d64;
+  color: white;
+}
+
+.mark-read-btn-small {
+  background: #fff;
+  border: 1px solid #c86d64;
+  color: #c86d64;
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.mark-read-btn-small:hover {
+  background: #c86d64;
+  color: white;
+}
+
+.notification-card {
+  border-left: 4px solid #c86d64;
+}
 
 /* Table Container */
 .table-card {
