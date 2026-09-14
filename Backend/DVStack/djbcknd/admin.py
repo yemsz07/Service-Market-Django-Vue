@@ -20,7 +20,7 @@ from .models import (
 
 
 # ==========================================
-# 📸 INLINES (Manage Images Inside Parent Pages)
+#  INLINES (Manage Images Inside Parent Pages)
 # ==========================================
 
 

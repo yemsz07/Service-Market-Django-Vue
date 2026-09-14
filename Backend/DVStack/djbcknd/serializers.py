@@ -10,8 +10,10 @@ Translates Django database models into JSON format (and vice versa) for API requ
 import logging
 
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password  # 🔧 CHANGED: added
 from django.core.validators import FileExtensionValidator
 from rest_framework import serializers
+from rest_framework.validators import UniqueValidator  # 🔧 CHANGED: added
 
 from .models import Category, Product, ProductImage, Service, ServiceInquiry, ServiceProviderProfile, Profile, Notification
 
@@ -65,9 +67,9 @@ class ProductSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
     images = ProductImageSerializer(many=True, read_only=True)
     city = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    
+
     image = serializers.ImageField(
-        required=False, 
+        required=False,
         write_only=True,
         allow_empty_file=False,
         validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'webp'])]
@@ -88,7 +90,6 @@ class ProductSerializer(serializers.ModelSerializer):
             'seller_user_id', 'seller_username', 'seller_avatar',
         ]
 
- 
     def get_seller_avatar(self, obj):
         """
         Ligtas na kinukuha ang avatar URL ng seller gamit ang null-checks.
@@ -112,13 +113,13 @@ class ProductSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         uploaded_image = validated_data.pop('image', None)
         product = super().create(validated_data)
-        
+
         if uploaded_image:
             try:
                 ProductImage.objects.create(product=product, image=uploaded_image, is_feature=True)
             except Exception as e:
                 logger.error(f"Failed to create ProductImage for Product ID {product.id}: {e}")
-            
+
         return product
 
 
@@ -144,19 +145,19 @@ class ServiceSerializer(serializers.ModelSerializer):
         model = Service
 
         fields = [
-            'id', 
-            'name', 
-            'description', 
-            'price', 
-            'service_city', 
-            'status', 
-            'category', 
-            'provider', 
+            'id',
+            'name',
+            'description',
+            'price',
+            'service_city',
+            'status',
+            'category',
+            'provider',
             'provider_name',
             'provider_user_id',
             'provider_avatar',
             'image',
-            'created_at', 
+            'created_at',
             'updated_at'
         ]
 
@@ -171,6 +172,7 @@ class ServiceSerializer(serializers.ModelSerializer):
                     return request.build_absolute_uri(img_obj.image.url)
                 return img_obj.image.url
         return None
+
 
 class CreateServiceSerializer(serializers.ModelSerializer):
     """
@@ -188,18 +190,18 @@ class CreateServiceSerializer(serializers.ModelSerializer):
             'required': 'Category is required.'
         }
     )
-    
+
     image = serializers.ImageField(required=False, write_only=True)
-    
+
     class Meta:
         model = Service
         fields = '__all__'
         read_only_fields = ['provider', 'created_at', 'updated_at']
-    
+
     def create(self, validated_data):
         uploaded_image = validated_data.pop('image', None)
         service = super().create(validated_data)
-        
+
         if uploaded_image:
             from .models import ServiceImage
             try:
@@ -210,7 +212,7 @@ class CreateServiceSerializer(serializers.ModelSerializer):
                 )
             except Exception as e:
                 logger.error(f"Failed to attach image to Service ID {service.id}: {e}")
-        
+
         return service
 
 
@@ -219,10 +221,24 @@ class CreateServiceSerializer(serializers.ModelSerializer):
 # ==========================================
 
 class UserSerializer(serializers.ModelSerializer):
+    # 🔧 CHANGED: explicit email field — required + unique, para walang duplicate accounts
+    # gamit ang parehong email (importante ito kapag gagamitin mo email para sa password reset)
+    email = serializers.EmailField(
+        required=True,
+        validators=[UniqueValidator(queryset=User.objects.all())]
+    )
+
     class Meta:
         model = User
         fields = ['username', 'email', 'password']
         extra_kwargs = {'password': {'write_only': True}}
+
+    def validate_password(self, value):
+        # 🔧 CHANGED: idinagdag — dati walang password strength check, kahit "1" na password
+        # ay papasa. Gagamitin nito ang AUTH_PASSWORD_VALIDATORS mo sa settings.py
+        # (min length, common password check, similarity sa username, atbp.)
+        validate_password(value)
+        return value
 
     def create(self, validated_data):
         user = User.objects.create_user(**validated_data)
@@ -239,8 +255,8 @@ class ServiceInquirySerializer(serializers.ModelSerializer):
     class Meta:
         model = ServiceInquiry
         fields = [
-            'id', 'client', 'client_name', 'client_username', 
-            'service', 'service_inquired', 'message', 
+            'id', 'client', 'client_name', 'client_username',
+            'service', 'service_inquired', 'message',
             'message_preview', 'status', 'date_received',
         ]
         read_only_fields = ['client', 'status', 'created_at']
@@ -273,7 +289,6 @@ class NotificationSerializer(serializers.ModelSerializer):
     Serializer for Notification model.
     """
     sender_name = serializers.CharField(source='sender.username', read_only=True)
-    
 
     class Meta:
         model = Notification
@@ -285,7 +300,7 @@ class NotificationSerializer(serializers.ModelSerializer):
             'sender',
             'sender_name',
             'service',
-            'service_name', 
+            'service_name',
             'inquiry',
             'is_read',
             'created_at'

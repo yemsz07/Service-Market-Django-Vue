@@ -48,6 +48,12 @@ const router = createRouter({
       component: () => import('../views/Pdashboard.vue'), 
       meta: { requiresAuth: true }
     },
+    {
+      path: '/portfolio',
+      name: 'portfolio',
+      component: () => import('../views/PortfolioView.vue'), 
+      meta: { requiresAuth: true }
+    },
   ],
 })
 

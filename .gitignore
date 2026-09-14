@@ -1,32 +1,145 @@
-# --- Backend (Django) ---
-# Ignore ALL compiled python files and caches in any folder
+```gitignore
+# =========================================================
+# ServiceMarket - .gitignore
+# Django Backend + Vue Frontend
+# =========================================================
+
+
+# =========================================================
+# BACKEND - PYTHON / DJANGO
+# =========================================================
+
+# Python cache / compiled files
 **/__pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
 
-# Ignore local database & media uploads
-Backend/**/db.sqlite3
-Backend/**/media/
-
-# Ignore virtual environments (kahit ano pang pangalan)
+# Python virtual environments
 venv/
 .venv/
 env/
 Backend/venv/
+Backend/.venv/
 
-# --- Frontend (Vue) ---
-# Ignore installed node packages & build output
+# Django local database
+Backend/**/db.sqlite3
+
+# Django uploaded media
+Backend/**/media/
+
+# Django collected static files
+Backend/**/staticfiles/
+
+# Python logs
+*.log
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Build / distribution
+build/
+dist/
+*.egg-info/
+
+
+# =========================================================
+# FRONTEND - VUE / NODE
+# =========================================================
+
+# Node dependencies
 **/node_modules/
+
+# Vue / Vite build output
 **/dist/
+
+# Nuxt / other frontend output (if used)
 Frontend/.output/
 
-# Ignore local environment variables & OS files
+# Frontend cache
+Frontend/.vite/
+Frontend/.nuxt/
+
+
+# =========================================================
+# ENVIRONMENT VARIABLES / SECRETS
+# =========================================================
+
+# Local environment files
 .env
 .env.local
-.DS_Store
-Thumbs.db
+.env.development
+.env.test
+.env.production
 
-# --- General / IDEs ---
+# Ignore all environment variants
+.env.*
+
+# BUT allow the safe template
+!.env.example
+
+
+# =========================================================
+# IDE / EDITORS
+# =========================================================
+
+# Visual Studio Code
 .vscode/
+
+# JetBrains IDEs
 .idea/
+
+# Other editor files
+*.swp
+*.swo
+*~
+
+
+# =========================================================
+# OPERATING SYSTEM FILES
+# =========================================================
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+
+# =========================================================
+# TEMPORARY FILES
+# =========================================================
+
+*.tmp
+*.temp
+*.bak
+
+
+# =========================================================
+# FRONTEND ENVIRONMENT FILES
+# =========================================================
+
+# Vue / Vite environment files
+Frontend/.env
+Frontend/.env.local
+Frontend/.env.development
+Frontend/.env.test
+Frontend/.env.production
+
+
+# =========================================================
+# OPTIONAL - LOCAL DEVELOPMENT FILES
+# =========================================================
+
+# Local test files / dumps
+*.dump
+*.sql
+
+# Local Redis / cache files
+*.rdb
+

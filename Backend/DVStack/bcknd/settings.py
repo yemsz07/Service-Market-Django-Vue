@@ -17,32 +17,36 @@ import ssl
 import certifi
 from decouple import config
 
+
 # ==========================================
 # ⚙️ PATHS & CORE SETTINGS
 # ==========================================
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: Keep secret key hidden in production using .env
-SECRET_KEY = 'django-insecure-iu51hq+@gu6jew+#r2cvyis0-!3#g(44!q$x=#b9(pb9@gmoqr'
 
 # SECURITY WARNING: Don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=True, cast=bool)
+DEBUG = config('DEBUG', default=False, cast=bool)  # 🔧 CHANGED: default False (dati True) — fail-safe
 
 ALLOWED_HOSTS = config(
-    'ALLOWED_HOSTS', 
-    default='127.0.0.1,localhost', 
+    'ALLOWED_HOSTS',
+    default='127.0.0.1,localhost',
     cast=lambda v: [s.strip() for s in v.split(',')]
 )
+
+# SECURITY WARNING: Keep secret key hidden in production using .env
+SECRET_KEY = config('SECRET_KEY')
+
+# PayMongo Credentials
+PAYMONGO_PUBLIC_KEY = config('PAYMONGO_PUBLIC_KEY', default='')
+PAYMONGO_SECRET_KEY = config('PAYMONGO_SECRET_KEY', default='')
 
 
 # ==========================================
 # 📦 INSTALLED APPS
 # ==========================================
 INSTALLED_APPS = [
-    # ASGI Server (Daphne MUST be first before staticfiles)
-    'daphne',
-
     # Built-in Django Apps
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -53,11 +57,14 @@ INSTALLED_APPS = [
     # Third-party Apps
     'corsheaders',
     'rest_framework',
+    'rest_framework_simplejwt',          
+    'rest_framework_simplejwt.token_blacklist',
     'channels',
 
     # Local Apps
     'djbcknd',
     'chatapp',
+    'paymongo',
 ]
 
 
@@ -108,7 +115,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': config('DB_NAME', default='dvstacks'),
         'USER': config('DB_USER', default='postgres'),
-        'PASSWORD': config('DB_PASSWORD', default='12345'),
+        'PASSWORD': config('DB_PASSWORD'),
         'HOST': config('DB_HOST', default='localhost'),
         'PORT': config('DB_PORT', default='5432'),
     },
@@ -116,7 +123,7 @@ DATABASES = {
     'mongodb': {
         'ENGINE': 'django_mongodb_backend',
         'NAME': config('MONGO_DB_NAME', default='servicemarket_db'),
-        'HOST': config('MONGO_URI', default='mongodb+srv://yemsz07_db_user:R1rCzgUsSOUhICJX@cluster0.85vsamp.mongodb.net/?appName=Cluster0'),
+        'HOST': config('MONGO_URI'),
     }
 }
 
@@ -126,10 +133,19 @@ DATABASE_ROUTERS = ['bcknd.db_routers.MongoRouter']
 # ==========================================
 # 🔴 CHANNELS & REDIS (For Real-time Chat)
 # ==========================================
-# Using in-memory channel layer for development (no Redis required)
 CHANNEL_LAYERS = {
     'default': {
-        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [{
+                "address": config('REDIS_URL'),
+                "ssl_ca_certs": certifi.where(),
+                "socket_timeout": None,       
+                "socket_keepalive": True,     
+                "retry_on_timeout": True,       
+                "health_check_interval": 30,
+            }],
+        },
     },
 }
 
@@ -141,6 +157,10 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'djbcknd.authentication.CustomJWTAuthentication',
     ),
+   
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '10/min',
+    },
 }
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -160,6 +180,19 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
+
+# 🔧 CHANGED: idinagdag — production-only hardening (hindi active kapag DEBUG=True,
+# para hindi ka mablock habang naglo-localhost na walang HTTPS)
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
 
 
 # ==========================================
