@@ -56,7 +56,7 @@
               icon="pi pi-comments" 
               class="p-button-outlined p-button-sm w-full mt-2" 
               :disabled="!currentUserId || !service.provider_user_id || currentUserId === service.provider_user_id"
-              @click="!currentUserId ? router.push({ name: 'login' }) : openChat(service.provider_user_id, service.provider_name, service.id, service.name)" 
+              @click="!currentUserId ? router.push({ name: 'login' }) : openChat(service)" 
             />
           </div>
 
@@ -164,8 +164,11 @@ const onImageError = (event) => {
   event.target.style.display = 'none';
 };
 
-// Handler para sa pag-chat sa provider
-const openChat = (providerId, providerName, serviceId = null, serviceName = null) => {
+// Handler para sa pag-chat sa provider (Updated: Tumatanggap na ng buong service)
+const openChat = (service) => {
+  const providerId = service.provider_user_id;
+  const providerName = service.provider_name || 'Provider';
+
   const myId = Number(currentUserId.value);
   const targetProviderId = Number(providerId);
 
@@ -173,13 +176,18 @@ const openChat = (providerId, providerName, serviceId = null, serviceName = null
     return;
   }
 
+  // Kuhanin ang totoong image URL ng service
+  const imageUrl = getImageUrl(service.image);
+
   router.push({
     name: 'messages',
     query: { 
       targetUserId: targetProviderId,
       sellerName: providerName,
-      serviceId: serviceId,
-      serviceName: serviceName
+      serviceId: service.id,
+      title: service.name,
+      price: service.price,
+      image: imageUrl
     }
   });
 };

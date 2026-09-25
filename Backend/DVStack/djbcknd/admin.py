@@ -6,6 +6,7 @@ verification.
 
 from django.contrib import admin
 from django.utils import timezone
+from . import admin_payment_transaction
 from django.utils.html import format_html
 
 from .models import (

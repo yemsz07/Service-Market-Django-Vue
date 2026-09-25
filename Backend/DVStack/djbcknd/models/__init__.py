@@ -10,6 +10,7 @@ from .category import Category
 from .product import Product, ProductImage
 from .service import Service, ServiceImage, ServiceInquiry
 from .notification import Notification
+from .payment_transaction import PaymentTransaction
  
 # Registers the post_save receivers — must be imported so Django connects them.
 from . import signals  # noqa: F401
@@ -24,5 +25,6 @@ __all__ = [
     'ServiceImage',
     'ServiceInquiry',
     'Notification',
+    'PaymentTransaction',
 ]
  

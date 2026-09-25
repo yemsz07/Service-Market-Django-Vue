@@ -1,6 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
-import axios from 'axios'
+import api from '../api/api'
+
+
+
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -54,6 +57,16 @@ const router = createRouter({
       component: () => import('../views/PortfolioView.vue'), 
       meta: { requiresAuth: true }
     },
+    {
+      path: '/payment-success',
+      name: 'PaymentSuccess',
+      component: () => import('../views/PaymentSuccess.vue')
+    },
+    {
+      path: '/payment-cancelled',
+      name: 'PaymentCancelled',
+      component: () => import('../views/PaymentCancelled.vue')
+    }
   ],
 })
 
@@ -67,15 +80,9 @@ router.beforeEach(async (to, from, next) => {
         console.log("CALLING CHECK AUTH")
 
         try {
-            const res = await axios.get(
-                "http://127.0.0.1:8000/api/check-auth/",
-                {
-                    withCredentials: true
-                }
-            )
+            const res = await api.get("/check-auth/")   // gagamitin na ang baseURL mula sa .env
 
             console.log(res.data)
-
             next()
 
         } catch (e) {

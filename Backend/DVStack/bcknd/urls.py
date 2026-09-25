@@ -15,14 +15,21 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path, include  # Siguraduhin na may 'include'
+from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from ninja import NinjaAPI
+from paymongo.api import router as paymongo_router
+from paymongo.webhook import webhook_router
+
+api = NinjaAPI()
+api.add_router("/", paymongo_router)
+api.add_router("/", webhook_router)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('djbcknd.urls')),
-    path('api/paymongo/', include('paymongo.urls')),
+    path('api/paymongo/', api.urls),   # ← ito yung pinalitan, kapalit ng include('paymongo.urls')
 ]
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

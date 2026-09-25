@@ -5,13 +5,13 @@ class WebSocketService {
     this.listeners = {};
   }
 
-  connect(endpoint) {
+connect(endpoint) {
     if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
       return;
     }
 
     const cleanEndpoint = endpoint.replace(/^\/+|\/+$/g, '');
-    const wsUrl = `ws://127.0.0.1:8000/ws/chat/${cleanEndpoint}/`;
+    const wsUrl = `ws://localhost:8000/ws/chat/${cleanEndpoint}/`;   
 
     this.socket = new WebSocket(wsUrl);
 

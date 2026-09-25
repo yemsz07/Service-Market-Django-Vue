@@ -16,6 +16,8 @@ from pathlib import Path
 import ssl
 import certifi
 from decouple import config
+from dotenv import load_dotenv
+from datetime import timedelta
 
 
 # ==========================================
@@ -33,12 +35,31 @@ ALLOWED_HOSTS = config(
     cast=lambda v: [s.strip() for s in v.split(',')]
 )
 
-# SECURITY WARNING: Keep secret key hidden in production using .env
+ALLOWED_HOSTS.append('.ngrok-free.dev')
+
+load_dotenv()
+
+PAYMONGO_WEBHOOK_SECRET = os.getenv('PAYMONGO_WEBHOOK_SECRET')
+
+
+# SECURITY WARNING: Keep secret key hidden in production
 SECRET_KEY = config('SECRET_KEY')
 
 # PayMongo Credentials
 PAYMONGO_PUBLIC_KEY = config('PAYMONGO_PUBLIC_KEY', default='')
 PAYMONGO_SECRET_KEY = config('PAYMONGO_SECRET_KEY', default='')
+
+
+# SimpleJWT Cookie Settings
+SIMPLE_JWT = {
+    'AUTH_COOKIE': 'access_token',  # Pangalan ng cookie mo
+    'AUTH_COOKIE_SAMESITE': 'Lax',  # IMPORTANT: Para maipasa pabalik galing external redirect
+    'AUTH_COOKIE_SECURE': False,    # False dahil HTTP/localhost ka nagte-test
+    'AUTH_COOKIE_HTTP_ONLY': True,
+
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),    
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+}
 
 
 # ==========================================
@@ -215,3 +236,14 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 DATABASE_ROUTERS = ['chatapp.db_router.MongoRouter']
+
+#======================================
+# PAYMONGO NOTIFICATION
+#======================================
+PAYMONGO_SUCCESS_URL = "http://localhost:5173/payment-success"
+PAYMONGO_CANCEL_URL = "http://localhost:5173/payment-cancelled"
+
+# PAYMONGO URL
+PAYMONGO_URL = "https://api.paymongo.com/v1"
+
+

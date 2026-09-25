@@ -84,6 +84,34 @@
             </div>
           </header>
 
+          <!-- Item Context Header Bar -->
+          <div v-if="activeChat.item" class="item-context-bar">
+            <div class="item-info">
+              <img 
+                v-if="activeChat.item.image" 
+                :src="activeChat.item.image" 
+                alt="Item Preview" 
+                class="item-thumbnail" 
+              />
+              <div v-else class="item-thumbnail-placeholder">📦</div>
+
+              <div class="item-text">
+                <span class="item-badge">{{ activeChat.item.type === 'services' ? 'Service' : 'Product' }}</span>
+                <h4 class="item-title">{{ activeChat.item.title }}</h4>
+                <p class="item-price">₱{{ activeChat.item.price.toLocaleString() }}</p>
+              </div>
+            </div>
+
+            <!-- Action Button para sa Payment Gateway -->
+            <button 
+              type="button" 
+              class="pay-now-btn" 
+              @click="initiatePayment(activeChat.item)"
+            >
+              💳 Pay Now
+            </button>
+          </div>
+
           <!-- Messages Body -->
           <div ref="messageContainer" class="messages-body">
             <template v-if="messages.length > 0">
@@ -190,24 +218,36 @@ const filteredConversations = computed(() => {
   );
 });
 
-// 1. Load Conversations List mula sa API
+// 1. Load Conversations List mula sa API (Tinanggal ang extra `/api` prefix)
 const loadConversations = async () => {
   try {
     const res = await api.get('/messages/conversations/');
     conversations.value = Array.isArray(res.data) ? res.data : [];
 
-    // Check query params (e.g., ?targetUserId=41&sellerName=sampleuser2&serviceId=5&serviceName=Web%20Design)
+    // Kuhanin ang lahat ng item URL query parameters
     const targetUserId = route.query.targetUserId;
     const sellerName = route.query.sellerName;
     const serviceId = route.query.serviceId;
-    const serviceName = route.query.serviceName;
+    const productId = route.query.productId;
+    const itemTitle = route.query.title || route.query.serviceName;
+    const itemPrice = route.query.price;
+    const itemImage = route.query.image;
 
-    // Store service info for notifications
     if (serviceId) currentServiceId.value = serviceId;
-    if (serviceName) currentServiceName.value = serviceName;
+    if (itemTitle) currentServiceName.value = itemTitle;
 
     if (targetUserId) {
       let targetChat = conversations.value.find(c => String(c.targetUserId) === String(targetUserId));
+      
+      // I-construct ang item object mula sa query params
+      const queryItem = (serviceId || productId || itemTitle) ? {
+        id: serviceId || productId,
+        title: itemTitle || 'Listing Item',
+        price: itemPrice ? Number(itemPrice) : 0,
+        image: itemImage || '',
+        type: serviceId ? 'services' : 'buy_and_sell'
+      } : null;
+
       if (!targetChat) {
         targetChat = {
           id: `temp_${targetUserId}`,
@@ -216,10 +256,14 @@ const loadConversations = async () => {
           lastMessage: 'Say hi to start trading!',
           time: '',
           online: true,
-          unread: false
+          unread: false,
+          item: queryItem
         };
         conversations.value = [targetChat, ...conversations.value];
+      } else if (queryItem) {
+        targetChat.item = queryItem;
       }
+
       await selectChat(targetChat);
     }
   } catch (err) {
@@ -231,13 +275,19 @@ const loadConversations = async () => {
 // 2. Select Chat Room (Loads History + Connects WebSocket)
 const selectChat = async (chat) => {
   try {
-    activeChat.value = chat;
-    if (chat) chat.unread = false;
+    if (!chat) return;
+
+    activeChat.value = {
+      ...chat,
+      item: chat?.item || null
+    };
+
+    chat.unread = false;
 
     // Disconnect lumang WS connection
     wsService.disconnect();
 
-    // Load Chat History (MongoDB via Django ORM API)
+    // Load Chat History
     try {
       const res = await api.get(`/messages/history/${chat.targetUserId}/`);
       messages.value = Array.isArray(res.data) ? res.data : [];
@@ -248,7 +298,7 @@ const selectChat = async (chat) => {
     }
 
     // Connect sa live WebSocket
-    if (chat && chat.targetUserId) {
+    if (chat.targetUserId) {
       connectWebSocket(chat.targetUserId);
     }
   } catch (err) {
@@ -262,21 +312,18 @@ const connectWebSocket = (targetUserId) => {
 
   wsService.on('message', (data) => {
     try {
-      // Pigilan ang duplicate messages
       const exists = messages.value.some(m => String(m.id) === String(data.id));
       if (!exists && data && data.id) {
-        const newMessage = {
+        const newMessageObj = {
           id: data.id,
           text: data.message || '',
           sender: String(data.sender_id) === String(activeChat.value?.targetUserId) ? 'them' : 'me',
           time: data.timestamp || ''
         };
         
-        // Use nextTick to ensure reactivity is properly tracked
         nextTick(() => {
-          messages.value = [...messages.value, newMessage];
+          messages.value = [...messages.value, newMessageObj];
           
-          // Update sidebar preview text
           if (activeChat.value) {
             activeChat.value = {
               ...activeChat.value,
@@ -306,6 +353,48 @@ const sendMessage = () => {
   });
 
   newMessage.value = '';
+};
+
+// 5. Payment Handler para sa Pay Now Button
+const initiatePayment = async (passedItem) => {
+  // Kunin ang item mula sa click parameter, activeChat, o route query
+  const itemToPay = passedItem || activeChat.value?.item || {
+    id: route.query.productId || route.query.serviceId,
+    price: route.query.price,
+    title: route.query.title,
+    type: route.query.productId ? 'buy_and_sell' : 'services'
+  };
+
+  console.log("Initiating payment for item:", itemToPay);
+
+  if (!itemToPay || !itemToPay.id) {
+    console.error("Walang valid na Item ID para sa payment transaction.");
+    return;
+  }
+
+  // Determine item_type based on the item's type field or route query
+  const itemType = itemToPay.type || (route.query.productId ? 'buy_and_sell' : 'services');
+
+  try {
+    // Tamang endpoint: `/api/paymongo/checkout/` at tamang payload format
+    const response = await api.post("/paymongo/checkout/", {
+      item_type: itemType,
+      item_id: itemToPay.id,
+    });
+
+    const checkoutUrl = response.data?.checkout_url;
+
+    if (checkoutUrl) {
+      window.location.href = checkoutUrl;
+    } else {
+      console.error("Walang checkout_url na ibinalik ang server:", response.data);
+    }
+  } catch (error) {
+    console.error("Failed to initiate payment:", error);
+    if (error.response) {
+      console.error("Error response:", error.response.data);
+    }
+  }
 };
 
 // Lifecycle Hooks
@@ -758,4 +847,97 @@ onUnmounted(() => {
   max-width: 300px;
   margin: 0;
 }
+
+/* ==========================================
+   ITEM CONTEXT HEADER BAR STYLES
+========================================== */
+.item-context-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background-color: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: inset 0 -1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.item-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.item-thumbnail {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid #e2e8f0;
+}
+
+.item-thumbnail-placeholder {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  background-color: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.item-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.item-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
+  letter-spacing: 0.5px;
+}
+
+.item-title {
+  margin: 2px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.item-price {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #16a34a;
+}
+
+.pay-now-btn {
+  background-color: #2563eb;
+  color: #ffffff;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pay-now-btn:hover {
+  background-color: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.pay-now-btn:active {
+  transform: translateY(0);
+}
+
+
 </style>

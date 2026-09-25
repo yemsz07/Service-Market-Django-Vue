@@ -32,35 +32,35 @@
             
             <template #header>
               <!-- Seller Info Header -->
-            <div class="seller-header px-3 pt-3 pb-2 flex align-items-center gap-2">
-              <img 
-                :src="product.seller_avatar || 'https://placehold.co/32x32?text=U'" 
-                class="seller-avatar" 
-                alt="avatar" 
-              />
-              <div class="seller-meta flex flex-column">
-                <span class="seller-name">{{ product.seller_username || 'ServiceMarket User' }}</span>
-                <span class="seller-time">Kani-kanina lang</span>
+              <div class="seller-header px-3 pt-3 pb-2 flex align-items-center gap-2">
+                <img 
+                  :src="product.seller_avatar || 'https://placehold.co/32x32?text=U'" 
+                  class="seller-avatar" 
+                  alt="avatar" 
+                />
+                <div class="seller-meta flex flex-column">
+                  <span class="seller-name">{{ product.seller_username || 'ServiceMarket User' }}</span>
+                  <span class="seller-time">Kani-kanina lang</span>
+                </div>
               </div>
-            </div>
 
-              <!-- 2. Product Image -->
+              <!-- Product Image -->
               <div class="img-wrapper">
                 <img :alt="product.name" :src="getProductImage(product)" class="product-img" />
               </div>
             </template>
 
-            <!-- 3. Title -->
+            <!-- Title -->
             <template #title>
-              <h3 class="name-limit mb-0">{{ product.name }}</h3>
+              <h3 class="name-limit mb-0">{{ product.name || product.title }}</h3>
             </template>
 
-            <!-- 4. Description -->
+            <!-- Description -->
             <template #content>
               <p class="desc-limit">{{ product.description }}</p>
             </template>
 
-            <!-- 5. Footer (Price + Chat Button + Heart) -->
+            <!-- Footer (Price + Chat Button + Heart) -->
             <template #footer>
               <div class="flex flex-column gap-2 pt-1">
                 <div class="flex justify-content-between align-items-center">
@@ -68,13 +68,13 @@
                   <i class="pi pi-heart text-xl text-500 cursor-pointer hover:text-red-500 transition-colors"></i>
                 </div>
 
-                <!-- Chat Seller Button -->
-               <Button 
+                <!-- Chat Seller Button (Updated @click handler) -->
+                <Button 
                   :label="!currentUserId ? 'Log in to Chat' : 'Chat Seller'" 
                   icon="pi pi-comments" 
                   class="p-button-outlined p-button-sm w-full mt-2" 
-                  :disabled="!currentUserId || !product.seller_user_id || currentUserId === product.seller_user_id"
-                  @click="!currentUserId ? router.push({ name: 'login' }) : openChat(product.seller_user_id, product.seller_username)" 
+                  :disabled="!currentUserId || !product.seller_user_id || Number(currentUserId) === Number(product.seller_user_id)"
+                  @click="!currentUserId ? router.push({ name: 'login' }) : openChat(product)" 
                 />
               </div>
             </template>
@@ -113,8 +113,11 @@ function getProductImage(product) {
   return `${baseUrl}${selected.image}`;
 }
 
-// Handler para sa pag-chat sa seller
-const openChat = (sellerId, sellerUsername) => {
+// Handler para sa pag-chat sa seller (Updated: Tumatanggap na ng buong product)
+const openChat = (product) => {
+  const sellerId = product.seller_user_id || product.user || product.seller;
+  const sellerUsername = product.seller_username || 'Seller';
+
   const myId = Number(currentUserId.value);
   const targetSellerId = Number(sellerId);
 
@@ -122,11 +125,18 @@ const openChat = (sellerId, sellerUsername) => {
     return;
   }
 
+  // Kuhanin ang totoong image URL ng product
+  const imageUrl = getProductImage(product);
+
   router.push({
     name: 'messages',
     query: { 
       targetUserId: targetSellerId,
-      sellerName: sellerUsername 
+      sellerName: sellerUsername,
+      productId: product.id,
+      title: product.name || product.title,
+      price: product.price,
+      image: imageUrl
     }
   });
 };
@@ -134,7 +144,6 @@ const openChat = (sellerId, sellerUsername) => {
 // Fetch Auth Status
 const checkAuth = async () => {
   try {
-    // 🟢 TAMA: /check-auth/ na lang dahil kasama na ang /api sa baseURL ng Axios
     const response = await api.get('/check-auth/');
     if (response.data && response.data.user) {
       currentUserId.value = response.data.user.id;
@@ -151,18 +160,17 @@ const fetchProducts = async () => {
     const response = await api.get('/buyandsell/');
     products.value = response.data;
   } catch (error) {
-    console.error('Error fetching products:', error); // okay ka lang mag-iwan nito, useful sa error tracking
-    // TODO: magdagdag ng error state/toast para makita ng user
+    console.error('Error fetching products:', error);
   } finally {
     isLoading.value = false; 
   }
 };
 
-// 🟢 Pinagsamang lifecycle hook para sabay i-load pagka-mount ng component
 onMounted(async () => {
   await Promise.all([checkAuth(), fetchProducts()]);
 });
 </script>
+
 
 <style scoped>
 .home-page { padding: 2rem; max-width: 1200px; margin: auto; }
