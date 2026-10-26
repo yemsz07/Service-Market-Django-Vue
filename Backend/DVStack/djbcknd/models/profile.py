@@ -37,6 +37,8 @@ class Profile(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
+    last_seen_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
     def __str__(self):
         return self.user.username
 

@@ -17,7 +17,7 @@ from djbcknd.models import PaymentTransaction
 webhook_router = Router(tags=["PayMongo Webhook"])
 
 # Ilang araw bago awtomatikong ma-release ang bayad kung walang dispute
-HOLD_PERIOD_DAYS = 5
+HOLD_PERIOD_DAYS = 1
 
 
 def _verify_signature(raw_body: bytes, signature_header: str) -> bool:

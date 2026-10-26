@@ -13,7 +13,6 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 import os
 from pathlib import Path
-import ssl
 import certifi
 from decouple import config
 from dotenv import load_dotenv
@@ -31,15 +30,16 @@ DEBUG = config('DEBUG', default=False, cast=bool)  # 🔧 CHANGED: default False
 
 ALLOWED_HOSTS = config(
     'ALLOWED_HOSTS',
-    default='127.0.0.1,localhost',
-    cast=lambda v: [s.strip() for s in v.split(',')]
+    default='',
+    cast=lambda v: [s.strip() for s in v.split(',') if s.strip()]
 )
 
-ALLOWED_HOSTS.append('.ngrok-free.dev')
+if DEBUG:
+    ALLOWED_HOSTS.append('.ngrok-free.dev')
 
 load_dotenv()
 
-PAYMONGO_WEBHOOK_SECRET = os.getenv('PAYMONGO_WEBHOOK_SECRET')
+PAYMONGO_WEBHOOK_SECRET = config('PAYMONGO_WEBHOOK_SECRET', default='')
 
 
 # SECURITY WARNING: Keep secret key hidden in production
@@ -50,15 +50,35 @@ PAYMONGO_PUBLIC_KEY = config('PAYMONGO_PUBLIC_KEY', default='')
 PAYMONGO_SECRET_KEY = config('PAYMONGO_SECRET_KEY', default='')
 
 
-# SimpleJWT Cookie Settings
 SIMPLE_JWT = {
-    'AUTH_COOKIE': 'access_token',  # Pangalan ng cookie mo
-    'AUTH_COOKIE_SAMESITE': 'Lax',  # IMPORTANT: Para maipasa pabalik galing external redirect
-    'AUTH_COOKIE_SECURE': False,    # False dahil HTTP/localhost ka nagte-test
-    'AUTH_COOKIE_HTTP_ONLY': True,
-
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),    
+    # Token lifetimes
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+
+    # Rotation at blacklisting
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,
+
+    # Signing — SEPARATE key, not SECRET_KEY
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': config('JWT_SIGNING_KEY'),
+
+    # Claims
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+
+    # Clock skew tolerance
+    'LEEWAY': timedelta(seconds=10),
+
+    # Audience / Issuer — para sa multi-service verification
+    'AUDIENCE': config('JWT_AUDIENCE', default='dvstack-api'),
+    'ISSUER': config('JWT_ISSUER', default='dvstack-auth'),
+
+    # Token classes
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'TOKEN_TYPE_CLAIM': 'token_type',
+    'JTI_CLAIM': 'jti',
 }
 
 
@@ -99,6 +119,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'chatapp.middleware.PresenceMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -195,32 +216,49 @@ AUTH_PASSWORD_VALIDATORS = [
 # ==========================================
 # 🌐 CORS CONFIGURATION
 # ==========================================
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
+CORS_ALLOWED_ORIGINS = config(
+    'CORS_ORIGINS',
+    default='http://localhost:5173,http://127.0.0.1:5173',
+    cast=lambda v: [s.strip() for s in v.split(',') if s.strip()]
+)
 
 CORS_ALLOW_CREDENTIALS = True
 
-SESSION_COOKIE_SAMESITE = 'Lax'
-CSRF_COOKIE_SAMESITE = 'Lax'
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-# 🔧 CHANGED: idinagdag — production-only hardening (hindi active kapag DEBUG=True,
-# para hindi ka mablock habang naglo-localhost na walang HTTPS)
+# HTTPS at HSTS
 if not DEBUG:
     SECURE_SSL_REDIRECT = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+
+    # Cookie security
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    CSRF_COOKIE_SAMESITE = 'Lax'
+
+if not DEBUG:
+    CSRF_TRUSTED_ORIGINS = config(
+        'CSRF_TRUSTED_ORIGINS',
+        default='',
+        cast=lambda v: [s.strip() for s in v.split(',') if s.strip()]
+    )
+
+# Content security
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+
+
 
 
 # ==========================================
 # 🌐 INTERNATIONALIZATION
 # ==========================================
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Manila'
 USE_I18N = True
 USE_TZ = True
 
@@ -235,15 +273,14 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-DATABASE_ROUTERS = ['chatapp.db_router.MongoRouter']
 
 #======================================
 # PAYMONGO NOTIFICATION
 #======================================
-PAYMONGO_SUCCESS_URL = "http://localhost:5173/payment-success"
-PAYMONGO_CANCEL_URL = "http://localhost:5173/payment-cancelled"
+PAYMONGO_SUCCESS_URL = config('PAYMONGO_SUCCESS_URL', default='http://localhost:5173/payment-success')
+PAYMONGO_CANCEL_URL = config('PAYMONGO_CANCEL_URL', default='http://localhost:5173/payment-cancelled')
 
 # PAYMONGO URL
-PAYMONGO_URL = "https://api.paymongo.com/v1"
+PAYMONGO_URL = config('PAYMONGO_URL', default='https://api.paymongo.com/v1')
 
 

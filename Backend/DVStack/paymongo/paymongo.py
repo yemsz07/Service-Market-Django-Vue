@@ -1,4 +1,18 @@
-from .services.checkout import get_or_create_transaction
+from .services.checkout import get_or_create_transaction, GCASH_MAX_AMOUNT
+
+
+def _build_payment_method_types(amount):
+    """
+    Dynamic na listahan ng payment methods base sa halaga. GCash lang ang
+    may mas mababang limitasyon (₱100,000) kaysa sa ibang methods, kaya
+    aalisin na lang natin ito sa listahan kung lumagpas — mananatiling
+    gumagana ang card/paymaya/dob para sa mataas na halaga, sa halip na
+    i-block ang BUONG checkout.
+    """
+    methods = ["card", "gcash", "paymaya", "dob"]
+    if amount > GCASH_MAX_AMOUNT:
+        methods.remove("gcash")
+    return methods
 
 
 def build_checkout_payload(
@@ -12,13 +26,15 @@ def build_checkout_payload(
     item_id,
     item_type,
 ):
+    amount = amount_in_cents / 100
+
     return {
         "data": {
             "attributes": {
                 "send_email_receipt": True,
                 "show_description": True,
                 "show_line_items": True,
-                "payment_method_types": ["card", "gcash", "paymaya", "dob"],
+                "payment_method_types": _build_payment_method_types(amount),
                 "line_items": [
                     {
                         "currency": "PHP",
@@ -46,6 +62,10 @@ def create_checkout(user, item_type, item_id, success_url, cancel_url):
     Orchestration function: kinukuha/ginagawa muna yung atomic
     PaymentTransaction (price mula sa DB, may double-sale + double-pay
     guards), tapos binubuo ang payload papunta sa PayMongo.
+
+    Dynamic na inaalis ang GCash sa payment methods kung lumagpas sa
+    ₱100,000 ang halaga — hindi na kailangang i-block ang buong checkout,
+    dahil gumagana pa rin ang card/paymaya/dob kahit gaano kataas.
 
     ASSUMPTION na kailangan mong i-verify: ginamit dito ang `.name` at
     `.description` fields ng Service model, katulad ng Product. Kung iba

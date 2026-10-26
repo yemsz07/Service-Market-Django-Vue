@@ -43,3 +43,21 @@ class ReleaseResponseSchema(Schema):
     item_name: str | None = None
     buyer_username: str | None = None
     released_by_username: str | None = None
+
+class AdminResolveDisputeSchema(Schema):
+    decision: str
+    admin_notes: str | None = None
+
+
+class DisputeResponseSchema(Schema):
+    id: int
+    reference_number: str
+    status: str
+    admin_decision: str
+    client_reason: str
+    client_proof_image: str | None = None
+    provider_counter_reason: str | None = None
+    provider_proof_image: str | None = None
+    response_deadline: str | None = None
+    resolved_at: str | None = None
+    resolved_by_username: str | None = None

@@ -1,4 +1,7 @@
 # chatapp/views.py
+from django.utils import timezone
+from chatapp.presence import ONLINE_WINDOW
+from djbcknd.models import Product, Service, Profile
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated

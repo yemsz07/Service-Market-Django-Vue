@@ -32,20 +32,20 @@ class CategoryListView(generics.ListAPIView):
 def create_service(request):
     user = request.user
 
-    # 1. Check kung may Profile at ServiceProviderProfile ang user
+    # 1. Check if user has Profile and ServiceProviderProfile
     if not hasattr(user, 'profile') or not hasattr(user.profile, 'service_profile'):
         return Response(
-            {"detail": "Kailangan mo munang mag-apply at mag-submit ng requirements para maging Service Provider."},
+            {"detail": "You need to apply and submit requirements first to become a Service Provider."},
             status=status.HTTP_403_FORBIDDEN
         )
 
     provider_profile = user.profile.service_profile
 
-    # 2. 🛡️ VERIFICATION CHECK: Approved ba siya ni Admin?
+    # 2. 🛡️ VERIFICATION CHECK: Is he/she approved by Admin?
     if provider_profile.approval_status != 'APPROVED':
         return Response(
             {
-                "detail": "Hindi ka pa pwedeng mag-post ng Service.",
+                "detail": "You are not yet allowed to post a Service.",
                 "status": provider_profile.approval_status,
                 "admin_notes": provider_profile.admin_notes
             },

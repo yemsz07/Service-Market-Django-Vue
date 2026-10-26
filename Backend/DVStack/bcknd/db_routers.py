@@ -1,7 +1,7 @@
 class MongoRouter:
     """
-    Ili-route lang ang models mula sa 'chatapp' patungong MongoDB,
-    at ang lahat ng iba pang models ay papuntang PostgreSQL.
+    Only route models from 'chatapp' to MongoDB,
+    and all other models go to PostgreSQL.
     """
     def db_for_read(self, model, **hints):
         if model._meta.app_label == 'chatapp':

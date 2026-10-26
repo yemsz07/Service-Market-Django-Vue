@@ -16,14 +16,24 @@ class ItemAlreadyPaidError(Exception):
 
 
 class AmountExceedsLimitError(Exception):
-    """Lumagpas ang presyo sa max na tinatanggap ng piniling payment methods."""
+    """Lumagpas ang presyo sa OVERALL na max na tinatanggap ng PayMongo
+    (kahit anong payment method), hindi na kayang iproseso kahit paano."""
     pass
 
 
-# GCash (isa sa mga payment_method_types natin) ay may sariling mas
-# mababang limitasyon kaysa sa overall na ₱9,999,999.99 ng PayMongo.
-# Kailangan i-validate ito DITO, bago pa man tumawag sa PayMongo API,
-# para hindi na kailangang mag-fail sa gitna ng checkout.
+# Overall na max ng PayMongo, kahit anong payment method — HARD LIMIT ito,
+# walang paraan ang PayMongo na tumanggap ng amount na lampas dito.
+# Overall na max ng PayMongo CHECKOUT SESSION (line item amount), kahit
+# anong payment method — HARD LIMIT ito, kumpirmado mismo sa aktwal na
+# error ng PayMongo API: "Amount can't be larger than 999,999.99."
+# (Note: iba ito sa mas mataas na Payment Intent limit na ₱9,999,999.99 —
+# mas mahigpit pala ang checkout session line item cap.)
+PAYMONGO_ABSOLUTE_MAX_AMOUNT = 999_999.99
+
+# GCash lang ang may mas mababang limitasyon kaysa sa ibang methods.
+# HINDI natin dapat i-block ang buong checkout dahil dito — sa halip,
+# aalisin na lang natin ang "gcash" sa listahan ng payment methods kung
+# lumagpas dito, para gumana pa rin ang card/paymaya/atbp.
 GCASH_MAX_AMOUNT = 100_000
 
 
@@ -39,8 +49,8 @@ def generate_idempotency_key(user_id, item_type, item_id, amount):
 
 def _get_item_and_price(item_type, item_id):
     """
-    ITO LANG ang pinagmumulan ng presyo — hinding-hindi mula sa client
-    request. Kunin ang item mula sa tamang model base sa item_type.
+    THIS ONLY determines the price — NEVER from the client
+    request. Get the item from the correct model based on item_type.
     """
     try:
         if item_type == 'buy_and_sell':
@@ -48,9 +58,9 @@ def _get_item_and_price(item_type, item_id):
         elif item_type == 'services':
             item = Service.objects.get(id=item_id)
         else:
-            raise ItemNotFoundError(f"Hindi kilalang item_type: {item_type}")
+            raise ItemNotFoundError(f"Unknown item_type: {item_type}")
     except (Product.DoesNotExist, Service.DoesNotExist):
-        raise ItemNotFoundError(f"Walang natagpuang item (type={item_type}, id={item_id}).")
+        raise ItemNotFoundError(f"No item found (type={item_type}, id={item_id}).")
 
     return item, item.price
 
@@ -58,33 +68,33 @@ def _get_item_and_price(item_type, item_id):
 @transaction.atomic
 def get_or_create_transaction(user, item_type, item_id):
     """
-    Generic na bersyon (buy_and_sell AT services) ng atomic get-or-create.
+    Generic version (buy_and_sell AND services) of atomic get-or-create.
 
-    Mga proteksyon dito:
+    Protections here:
 
-    1. PRICE TAMPERING GUARD — ang amount ay laging kinukuha mula sa DB
-       (_get_item_and_price), hinding-hindi mula sa request payload.
+    1. PRICE TAMPERING GUARD — amount is always taken from DB
+       (_get_item_and_price), NEVER from request payload.
 
-    2. DOUBLE-SALE GUARD — kung may existing PAID transaction na para sa
-       parehong item (kahit sinong user), itataas ang ItemAlreadyPaidError.
-       Query lang ito sa PaymentTransaction table — walang ginagalaw o
-       kinukuha na lock sa Product/Service model mismo.
+    2. DOUBLE-SALE GUARD — if there's an existing PAID transaction for
+       the same item (any user), raise ItemAlreadyPaidError.
+       This only queries the PaymentTransaction table — no locking or
+       touching the Product/Service model itself.
 
-    3. DOUBLE-CLICK / DOUBLE-PAY GUARD (parehong user) — idempotency_key
-       (user+item_type+item_id+amount) + select_for_update() sa
-       PaymentTransaction, plus DB-level partial UniqueConstraint bilang
-       huling safety net (IntegrityError fallback).
+    3. DOUBLE-CLICK / DOUBLE-PAY GUARD (same user) — idempotency_key
+       (user+item_type+item_id+amount) + select_for_update() on
+       PaymentTransaction, plus DB-level partial UniqueConstraint as
+       final safety net (IntegrityError fallback).
 
     Raises:
         ItemNotFoundError, ItemAlreadyPaidError
     """
     item, real_price = _get_item_and_price(item_type, item_id)
 
-    if real_price > GCASH_MAX_AMOUNT:
+    if real_price > PAYMONGO_ABSOLUTE_MAX_AMOUNT:
         raise AmountExceedsLimitError(
-            f"Ang presyo (₱{real_price:,.2f}) ay lumalagpas sa ₱{GCASH_MAX_AMOUNT:,.2f} "
-            "na limitasyon para sa GCash. Piliin ang ibang payment method (card, atbp.) "
-            "o kontakin ang PayMongo para sa mas mataas na limitasyon."
+            f"The price (₱{real_price:,.2f}) exceeds ₱{PAYMONGO_ABSOLUTE_MAX_AMOUNT:,.2f}, "
+        "the maximum amount accepted by PayMongo regardless of the "
+        "payment method. This cannot be processed."
         )
 
     # Double-sale guard: may nakabayad na ba dati para sa item na ito?

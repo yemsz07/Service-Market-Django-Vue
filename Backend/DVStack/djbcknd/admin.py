@@ -6,7 +6,6 @@ verification.
 
 from django.contrib import admin
 from django.utils import timezone
-from . import admin_payment_transaction
 from django.utils.html import format_html
 
 from .models import (
@@ -17,6 +16,8 @@ from .models import (
     Service,
     ServiceImage,
     ServiceProviderProfile,
+    Dispute,
+    PaymentTransaction,
 )
 
 
@@ -281,3 +282,115 @@ class ServiceAdmin(admin.ModelAdmin):
   @admin.display(description='Provider')
   def provider_username(self, obj):
     return obj.provider.profile.user.username
+
+
+# ==========================================
+# 💳 6. PAYMENT TRANSACTION & DISPUTE MANAGEMENT
+# ==========================================
+
+
+@admin.register(PaymentTransaction)
+class PaymentTransactionAdmin(admin.ModelAdmin):
+  """Admin interface for managing payment transactions."""
+  
+  list_display = (
+      "reference_number",
+      "transaction_type",
+      "user",
+      "amount",
+      "status",
+      "dispute_deadline",
+      "released_at",
+      "released_by",
+      "created_at",
+  )
+  list_filter = ("status", "transaction_type")
+  search_fields = ("reference_number", "user__username", "paymongo_checkout_id")
+  readonly_fields = (
+      "reference_number", "idempotency_key", "checkout_url_cache",
+      "paymongo_checkout_id", "created_at", "updated_at",
+  )
+  ordering = ("-created_at",)
+
+  actions = ["release_selected_payments"]
+
+  @admin.action(description="Release selected PAID payments to the seller/Service Provider")
+  def release_selected_payments(self, request, queryset):
+    """
+    Admin action: admin selects rows in the list, then
+    clicks this action — same logic as POST /release/
+    endpoint, but directly inside Django Admin.
+    """
+    eligible = queryset.filter(status="PAID")
+    skipped_count = queryset.exclude(status="PAID").count()
+
+    released_count = 0
+    for txn in eligible:
+      txn.status = "RELEASED"
+      txn.released_at = timezone.now()
+      txn.released_by = request.user
+      txn.save(update_fields=["status", "released_at", "released_by"])
+      released_count += 1
+
+    if released_count:
+      self.message_user(request, f"{released_count} transaction(s) released.")
+    if skipped_count:
+      self.message_user(
+          request,
+          f"{skipped_count} transaction(s) skipped (not PAID status).",
+          level="warning",
+      )
+
+
+@admin.register(Dispute)
+class DisputeAdmin(admin.ModelAdmin):
+  """Admin interface for managing payment disputes."""
+  
+  list_display = (
+      'id',
+      'reference_number',
+      'status',
+      'admin_decision',
+      'filed_by_username',
+      'created_at',
+      'resolved_at',
+  )
+  list_filter = ('status', 'admin_decision', 'created_at')
+  search_fields = (
+      'payment_transaction__reference_number',
+      'filed_by__username',
+      'client_reason',
+  )
+  readonly_fields = (
+      'created_at',
+      'updated_at',
+      'filed_at',
+      'provider_responded_at',
+      'resolved_at',
+  )
+  
+  fieldsets = (
+      ('📋 Dispute Information', {
+          'fields': ('payment_transaction', 'filed_by', 'status', 'admin_decision')
+      }),
+      ('📝 Client Details', {
+          'fields': ('client_reason', 'client_proof_image')
+      }),
+      ('📝 Provider Response', {
+          'fields': ('provider_counter_reason', 'provider_proof_image', 'provider_responded_at')
+      }),
+      ('⏰ Deadlines & Timing', {
+          'fields': ('response_deadline', 'filed_at', 'created_at', 'updated_at')
+      }),
+      ('🛡️ Admin Resolution', {
+          'fields': ('admin_notes', 'resolved_by', 'resolved_at', 'auto_resolved')
+      }),
+  )
+  
+  @admin.display(description='Reference Number')
+  def reference_number(self, obj):
+    return obj.payment_transaction.reference_number
+  
+  @admin.display(description='Filed By')
+  def filed_by_username(self, obj):
+    return obj.filed_by.username if obj.filed_by else 'N/A'

@@ -28,8 +28,8 @@ api.add_router("/", webhook_router)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include('djbcknd.urls')),
-    path('api/paymongo/', api.urls),   # ← ito yung pinalitan, kapalit ng include('paymongo.urls')
+    path('api/paymongo/', api.urls),     
+    path('api/', include('djbcknd.urls')), 
 ]
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

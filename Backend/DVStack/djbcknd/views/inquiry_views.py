@@ -26,7 +26,7 @@ def create_inquiry(request):
 
     if not service_id or not message:
         return Response(
-            {"error": "Kailangan ang service at message."},
+            {"error": "Service and message are required."},
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -34,7 +34,7 @@ def create_inquiry(request):
         service = Service.objects.get(id=service_id)
     except Service.DoesNotExist:
         return Response(
-            {"error": "Hindi natagpuan ang service."},
+            {"error": "Service not found."},
             status=status.HTTP_404_NOT_FOUND
         )
 
